@@ -186,6 +186,9 @@ Get-SmbShare
 **Registry Analysis:**
 ```powershell
 # AutoRun entries
+reg query HKCU\Software\SimonTatham\PuTTY\Sessions
+
+
 Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 
