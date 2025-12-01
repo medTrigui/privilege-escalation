@@ -426,7 +426,6 @@ getenforce
 uname -a
 cat /etc/os-release
 ```
-
 - Document kernel, distro, architecture for exploit matching.
 
 ### Research & Selection
@@ -446,6 +445,11 @@ gcc /tmp/exploit.c -o /tmp/exploit
 id
 ```
 
-- Prefer compiling on target to avoid dependency mismatches. Clean up binaries and logs per engagement rules.
+### Screen Vulnerabilities
+```bash
+ls -l /usr/bin/screen*
+```
+
+- Prefer compiling on the target to avoid dependency mismatches. Clean up binaries and logs per engagement rules.
 
 ---
