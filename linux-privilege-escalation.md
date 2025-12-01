@@ -448,6 +448,9 @@ id
 ### Screen Vulnerabilities
 ```bash
 ls -l /usr/bin/screen*
+
+Example: VULNERABLE
+-rwsr-xr-x 1 root root 1860304 May 10  2021 /usr/bin/screen-4.5.0
 ```
 
 - Prefer compiling on the target to avoid dependency mismatches. Clean up binaries and logs per engagement rules.
