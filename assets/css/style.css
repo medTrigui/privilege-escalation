@@ -27,11 +27,11 @@ body.theme-windows {
 }
 
 body.theme-home {
-    --primary: #f87171;
+    --primary: #fca5a5;
     --accent: #ef4444;
     --accent-soft: #fee2e2;
     --lighter: #fef2f2;
-    --border: #fca5a5;
+    --border: #fda4af;
 }
 
 * {
@@ -103,8 +103,8 @@ body {
     position: absolute;
     top: 0;
     right: 0;
-    width: 2.15rem;
-    height: 2.15rem;
+    width: 2.65rem;
+    height: 2.65rem;
     color: rgba(255, 255, 255, 0.95);
     display: inline-flex;
     align-items: center;
@@ -121,9 +121,29 @@ body {
 }
 
 .github-corner svg {
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 1.35rem;
+    height: 1.35rem;
     fill: currentColor;
+}
+
+.github-star-link {
+    position: absolute;
+    top: 0.25rem;
+    right: 3.15rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+    text-decoration: none;
+    font-size: 0.84rem;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.github-star-link:hover {
+    background: rgba(255, 255, 255, 0.24);
+    text-decoration: none;
 }
 
 .site-title a {
@@ -511,6 +531,13 @@ article header {
     .github-corner {
         position: static;
         margin-bottom: 0.9rem;
+    }
+
+    .github-star-link {
+        position: static;
+        display: inline-block;
+        margin-bottom: 0.65rem;
+        margin-right: 0.5rem;
     }
     
     main {
