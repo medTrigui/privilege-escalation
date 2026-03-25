@@ -18,8 +18,8 @@
 }
 
 body.theme-windows {
-    --primary: #60a5fa;
-    --accent: #3b82f6;
+    --primary: #93c5fd;
+    --accent: #60a5fa;
     --accent-soft: #dbeafe;
     --lighter: #eff6ff;
     --border: #bfdbfe;
@@ -30,8 +30,8 @@ body.theme-home {
     --primary: #f87171;
     --accent: #ef4444;
     --accent-soft: #fee2e2;
-    --lighter: #fff1f2;
-    --border: #fecdd3;
+    --lighter: #fef2f2;
+    --border: #fca5a5;
 }
 
 * {
@@ -64,6 +64,7 @@ body {
 .header-content {
     max-width: 1200px;
     margin: 0 auto 1.5rem;
+    position: relative;
 }
 
 .site-title {
@@ -91,11 +92,38 @@ body {
 }
 
 .site-logo-img {
-    width: 2rem;
-    height: 2rem;
+    width: 2.35rem;
+    height: 2.35rem;
     border-radius: 0.5rem;
     vertical-align: middle;
     flex-shrink: 0;
+}
+
+.github-corner {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 2.15rem;
+    height: 2.15rem;
+    color: rgba(255, 255, 255, 0.95);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.14);
+    transition: all 0.2s ease;
+}
+
+.github-corner:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.24);
+}
+
+.github-corner svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: currentColor;
 }
 
 .site-title a {
@@ -404,6 +432,32 @@ article header {
     margin: 2rem 0;
 }
 
+.repo-stats {
+    margin-top: 1rem;
+}
+
+.badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+}
+
+.badge-row img {
+    height: 22px;
+}
+
+.star-box {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--lighter);
+    padding: 0.9rem 1rem;
+}
+
+.star-box p {
+    margin-bottom: 0.55rem;
+}
+
 .card {
     background: white;
     border: 1px solid var(--border);
@@ -452,6 +506,11 @@ article header {
     
     .site-nav a {
         font-size: 0.85rem;
+    }
+
+    .github-corner {
+        position: static;
+        margin-bottom: 0.9rem;
     }
     
     main {

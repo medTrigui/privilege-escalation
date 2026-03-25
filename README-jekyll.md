@@ -1,6 +1,10 @@
-# Privilege Escalation Guide
+# PrivEsc
 
-A comprehensive Jekyll-based reference guide for Linux and Windows privilege escalation techniques, tradecraft, and exploitation patterns.
+A comprehensive Jekyll-based reference for Linux and Windows privilege escalation techniques, tradecraft, and exploitation patterns.
+
+## Live Project
+
+- https://medtrigui.github.io/privilege-escalation/
 
 ## Features
 
