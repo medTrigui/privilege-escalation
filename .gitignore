@@ -1,0 +1,13 @@
+_site/
+.jekyll-cache/
+.sass-cache/
+*.gem
+.bundle/
+Gemfile.lock
+.DS_Store
+.vscode/
+*.swp
+*.swo
+*~
+.env
+.env.local

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if page.title %}{{ page.title }} - {% endif %}{{ site.title }}</title>
+    <meta name="description" content="{{ site.description }}">
+    <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+</head>
+<body>
+    {% include header.html %}
+    
+    <div class="container">
+        <main>
+            {{ content }}
+        </main>
+        
+        {% if page.layout == 'page' %}
+        <aside class="sidebar">
+            <nav class="docs-nav">
+                <h3>Linux Privilege Escalation</h3>
+                <ul>
+                    <li><a href="{{ '/docs/linux-privilege-escalation/#1-enumerating-linux' | relative_url }}">1. Enumerating Linux</a></li>
+                    <li><a href="{{ '/docs/linux-privilege-escalation/#2-exposed-confidential-information' | relative_url }}">2. Exposed Information</a></li>
+                    <li><a href="{{ '/docs/linux-privilege-escalation/#3-insecure-file-permissions' | relative_url }}">3. Insecure Permissions</a></li>
+                    <li><a href="{{ '/docs/linux-privilege-escalation/#4-insecure-system-components' | relative_url }}">4. System Components</a></li>
+                </ul>
+                
+                <h3>Windows Privilege Escalation</h3>
+                <ul>
+                    <li><a href="{{ '/docs/windows-privilege-escalation/' | relative_url }}">View Guide</a></li>
+                </ul>
+            </nav>
+        </aside>
+        {% endif %}
+    </div>
+    
+    {% include footer.html %}
+</body>
+</html>

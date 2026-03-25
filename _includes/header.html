@@ -1,0 +1,18 @@
+<header class="site-header">
+    <div class="header-content">
+        <h1 class="site-title">
+            <a href="{{ '/' | relative_url }}">{{ site.title }}</a>
+        </h1>
+        <p class="site-description">{{ site.description }}</p>
+    </div>
+    
+    <nav class="site-nav">
+        <ul>
+            <li><a href="{{ '/' | relative_url }}" {% if page.url == '/' %}class="active"{% endif %}>Home</a></li>
+            <li><a href="{{ '/docs/linux-privilege-escalation/' | relative_url }}" {% if page.url contains 'linux' %}class="active"{% endif %}>Linux</a></li>
+            <li><a href="{{ '/docs/windows-privilege-escalation/' | relative_url }}" {% if page.url contains 'windows' %}class="active"{% endif %}>Windows</a></li>
+            <li><a href="https://gtfobins.org/" target="_blank">GTFOBins ↗</a></li>
+            <li><a href="https://medtrigui.github.io/escabin/" target="_blank">Escabin ↗</a></li>
+        </ul>
+    </nav>
+</header>

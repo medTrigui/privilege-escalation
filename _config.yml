@@ -1,0 +1,32 @@
+title: Privilege Escalation Guide
+description: Comprehensive Linux and Windows Privilege Escalation Techniques and Tradecraft
+author: Security Research
+email: contact@example.com
+
+url: ""
+baseurl: ""
+
+markdown: kramdown
+highlighter: rouge
+
+theme_color: "#2c3e50"
+accent_color: "#e74c3c"
+
+jekyll:
+  paginate: 10
+
+collections:
+  docs:
+    output: true
+    permalink: /:collection/:path/
+
+exclude:
+  - .git
+  - .gitignore
+  - .jekyll-cache
+  - .sass-cache
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - LICENSE
+  - node_modules

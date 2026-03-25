@@ -1,3 +1,10 @@
+---
+layout: page
+title: Linux Privilege Escalation
+description: Comprehensive techniques for Linux privilege escalation through enumeration, credential harvesting, and system component exploitation
+order: 1
+---
+
 # Linux Privilege Escalation
 
 ## Overview
@@ -40,6 +47,7 @@ Enumeration is the backbone of every Linux escalation. Start broad, capture fact
 
 ```bash
 ls -l /etc/shadow
+# -rw-r----- 1 root shadow 1762 May  2 09:31 /etc/shadow
 ```
 
 - Owner/group/others each have `rwx` flags.
