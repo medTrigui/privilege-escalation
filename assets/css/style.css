@@ -3,8 +3,8 @@
    ============================================ */
 
 :root {
-    --primary: #f97316;
-    --accent: #ea580c;
+    --primary: #fb923c;
+    --accent: #f97316;
     --accent-soft: #ffedd5;
     --secondary: #1f2937;
     --light: #e5e7eb;
@@ -18,8 +18,8 @@
 }
 
 body.theme-windows {
-    --primary: #2563eb;
-    --accent: #1d4ed8;
+    --primary: #60a5fa;
+    --accent: #3b82f6;
     --accent-soft: #dbeafe;
     --lighter: #eff6ff;
     --border: #bfdbfe;
@@ -27,11 +27,11 @@ body.theme-windows {
 }
 
 body.theme-home {
-    --primary: #f59e0b;
-    --accent: #2563eb;
-    --accent-soft: #e0f2fe;
-    --lighter: #fefce8;
-    --border: #fde68a;
+    --primary: #f87171;
+    --accent: #ef4444;
+    --accent-soft: #fee2e2;
+    --lighter: #fff1f2;
+    --border: #fecdd3;
 }
 
 * {
@@ -145,7 +145,7 @@ body {
     margin: 0 auto;
     padding: 0 1rem;
     display: grid;
-    grid-template-columns: 1fr 250px;
+    grid-template-columns: minmax(0, 1fr) 280px;
     gap: 2rem;
     margin-bottom: 3rem;
 }
@@ -165,6 +165,7 @@ main {
     padding: 2rem;
     border-radius: 10px;
     box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    min-width: 0;
 }
 
 /* Sidebar Navigation */
@@ -197,6 +198,13 @@ main {
     margin-bottom: 0.9rem;
 }
 
+.docs-nav ul ul {
+    margin-top: 0.25rem;
+    margin-left: 0.5rem;
+    border-left: 1px dashed var(--border);
+    padding-left: 0.45rem;
+}
+
 .docs-nav li {
     margin-bottom: 0.35rem;
 }
@@ -210,6 +218,12 @@ main {
     border-left: 3px solid transparent;
     border-radius: 0 6px 6px 0;
     transition: all 0.2s ease;
+}
+
+.docs-nav ul ul a {
+    font-size: 0.82rem;
+    color: #4b5563;
+    padding: 0.25rem 0.5rem;
 }
 
 .docs-nav a:hover {
