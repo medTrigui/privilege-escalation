@@ -3,8 +3,8 @@ description: Comprehensive Linux and Windows Privilege Escalation Techniques and
 author: Security Research
 email: contact@example.com
 
-url: ""
-baseurl: ""
+url: "https://medtrigui.github.io"
+baseurl: "/privilege-escalation"
 
 markdown: kramdown
 highlighter: rouge
