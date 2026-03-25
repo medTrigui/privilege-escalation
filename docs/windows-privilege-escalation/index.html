@@ -7,11 +7,11 @@
     <meta name="description" content="Comprehensive Linux and Windows Privilege Escalation Techniques and Tradecraft">
     <link rel="stylesheet" href="/privilege-escalation/assets/css/style.css">
 </head>
-<body>
+<body class="theme-windows">
     <header class="site-header">
     <div class="header-content">
         <h1 class="site-title">
-            <a href="/privilege-escalation/">Privilege Escalation Guide</a>
+          <a href="/privilege-escalation/"><img class="site-logo-img" src="/privilege-escalation/assets/logo.svg" alt="Privilege Escalation Guide logo"> Privilege Escalation Guide</a>
         </h1>
         <p class="site-description">Comprehensive Linux and Windows Privilege Escalation Techniques and Tradecraft</p>
     </div>
@@ -1567,17 +1567,16 @@ exploit
         
         <aside class="sidebar">
             <nav class="docs-nav">
-                <h3>Linux Privilege Escalation</h3>
+            <h3>Windows Guide</h3>
                 <ul>
-                    <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#1-enumerating-linux">1. Enumerating Linux</a></li>
-                    <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#2-exposed-confidential-information">2. Exposed Information</a></li>
-                    <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#3-insecure-file-permissions">3. Insecure Permissions</a></li>
-                    <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#4-insecure-system-components">4. System Components</a></li>
+              <li><a href="/privilege-escalation/docs/windows-privilege-escalation/#1-enumerating-windows" class="active">1. Enumerating Windows</a></li>
+              <li><a href="/privilege-escalation/docs/windows-privilege-escalation/#2-leveraging-windows-services">2. Windows Services</a></li>
+              <li><a href="/privilege-escalation/docs/windows-privilege-escalation/#3-abusing-other-windows-components">3. Other Components</a></li>
                 </ul>
                 
-                <h3>Windows Privilege Escalation</h3>
+            <h3>Switch Guide</h3>
                 <ul>
-                    <li><a href="/privilege-escalation/docs/windows-privilege-escalation/">View Guide</a></li>
+              <li><a href="/privilege-escalation/docs/linux-privilege-escalation/">Linux Privilege Escalation</a></li>
                 </ul>
             </nav>
         </aside>
@@ -1594,6 +1593,52 @@ exploit
         </p>
     </div>
 </footer>
+
+  <script>
+  (() => {
+    const tocLinks = Array.from(document.querySelectorAll('.docs-nav a[href*="#"]'));
+    if (!tocLinks.length) return;
+
+    const sectionMap = new Map();
+    tocLinks.forEach((link) => {
+      const hash = link.hash;
+      if (!hash) return;
+      const target = document.getElementById(hash.slice(1));
+      if (target) sectionMap.set(target, link);
+    });
+
+    if (!sectionMap.size) return;
+
+    const setActive = (activeLink) => {
+      tocLinks.forEach((link) => link.classList.toggle('active', link === activeLink));
+    };
+
+    const updateFromHash = () => {
+      const current = tocLinks.find((link) => link.hash === window.location.hash);
+      if (current) setActive(current);
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+      if (visible.length > 0) {
+        const activeTarget = visible[0].target;
+        const activeLink = sectionMap.get(activeTarget);
+        if (activeLink) setActive(activeLink);
+      }
+    }, {
+      root: null,
+      rootMargin: '-20% 0px -65% 0px',
+      threshold: [0, 1]
+    });
+
+    sectionMap.forEach((_, section) => observer.observe(section));
+    updateFromHash();
+    window.addEventListener('hashchange', updateFromHash);
+  })();
+  </script>
 
 </body>
 </html>

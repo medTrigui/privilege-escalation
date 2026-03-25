@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Privilege Escalation Guide Logo</title>
+  <desc id="desc">Minimal up-right arrow logo with transparent background</desc>
+  <defs>
+    <linearGradient id="arrow" x1="16" y1="48" x2="50" y2="14" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <path d="M16 46 30 32 38 40 47 27" fill="none" stroke="url(#arrow)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M56 18 50 31 42 23Z" fill="url(#arrow)"/>
+</svg>

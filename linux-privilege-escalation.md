@@ -446,7 +446,8 @@ searchsploit "linux kernel <distro> <version> privilege"
 - Filter by kernel range, exploit stability, and required dependencies.
 
 ### Compile & Execute
-<user>@<target>:/tmp/
+```bash
+cd /tmp
 gcc /tmp/exploit.c -o /tmp/exploit
 /tmp/exploit
 id
@@ -463,7 +464,5 @@ ls -lah /usr/bin/<binary>*
 - Check kernel version against known CVEs (e.g., dirty COW, no_new_privs bypass).
 - Use **[searchsploit](https://www.exploit-db.com/)** to cross-reference available exploits.
 - Always test exploit stability in non-production environments first
-
-- Prefer compiling on the target to avoid dependency mismatches. Clean up binaries and logs per engagement rules.
 
 ---

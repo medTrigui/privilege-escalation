@@ -7,11 +7,11 @@
     <meta name="description" content="Comprehensive Linux and Windows Privilege Escalation Techniques and Tradecraft">
     <link rel="stylesheet" href="/privilege-escalation/assets/css/style.css">
 </head>
-<body>
+<body class="theme-linux">
     <header class="site-header">
     <div class="header-content">
         <h1 class="site-title">
-            <a href="/privilege-escalation/">Privilege Escalation Guide</a>
+          <a href="/privilege-escalation/"><img class="site-logo-img" src="/privilege-escalation/assets/logo.svg" alt="Privilege Escalation Guide logo"> Privilege Escalation Guide</a>
         </h1>
         <p class="site-description">Comprehensive Linux and Windows Privilege Escalation Techniques and Tradecraft</p>
     </div>
@@ -83,7 +83,6 @@
 <h3 id="filesystem-permissions">Filesystem Permissions</h3>
 
 <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">ls</span> <span class="nt">-l</span> /etc/shadow
-<span class="c"># -rw-r----- 1 root shadow 1762 May  2 09:31 /etc/shadow</span>
 </code></pre></div></div>
 
 <ul>
@@ -529,28 +528,30 @@ getenforce
 </ul>
 
 <h3 id="compile--execute">Compile &amp; Execute</h3>
-<user>@<target>:/tmp/
-gcc /tmp/exploit.c -o /tmp/exploit
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cd</span> /tmp
+gcc /tmp/exploit.c <span class="nt">-o</span> /tmp/exploit
 /tmp/exploit
 id
-```
+</code></pre></div></div>
 
-- Prefer compiling on the target to avoid dependency mismatches.
-- Clean up binaries and forensic artifacts per engagement rules.
+<ul>
+  <li>Prefer compiling on the target to avoid dependency mismatches.</li>
+  <li>Clean up binaries and forensic artifacts per engagement rules.</li>
+</ul>
 
-### Notable Vulnerable Patterns
-```bash
-ls -lah /usr/bin/<binary>*
-```
+<h3 id="notable-vulnerable-patterns">Notable Vulnerable Patterns</h3>
 
-- Check kernel version against known CVEs (e.g., dirty COW, no_new_privs bypass).
-- Use **[searchsploit](https://www.exploit-db.com/)** to cross-reference available exploits.
-- Always test exploit stability in non-production environments first
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">ls</span> <span class="nt">-lah</span> /usr/bin/&lt;binary&gt;<span class="k">*</span>
+</code></pre></div></div>
 
-- Prefer compiling on the target to avoid dependency mismatches. Clean up binaries and logs per engagement rules.
+<ul>
+  <li>Check kernel version against known CVEs (e.g., dirty COW, no_new_privs bypass).</li>
+  <li>Use <strong><a href="https://www.exploit-db.com/">searchsploit</a></strong> to cross-reference available exploits.</li>
+  <li>Always test exploit stability in non-production environments first.</li>
+</ul>
 
----
-</binary></target></user>
+<hr />
 
 </article>
 
@@ -559,17 +560,17 @@ ls -lah /usr/bin/<binary>*
         
         <aside class="sidebar">
             <nav class="docs-nav">
-                <h3>Linux Privilege Escalation</h3>
+            <h3>Linux Guide</h3>
                 <ul>
-                    <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#1-enumerating-linux">1. Enumerating Linux</a></li>
-                    <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#2-exposed-confidential-information">2. Exposed Information</a></li>
-                    <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#3-insecure-file-permissions">3. Insecure Permissions</a></li>
-                    <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#4-insecure-system-components">4. System Components</a></li>
+              <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#1-enumerating-linux" class="active">1. Enumerating Linux</a></li>
+              <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#2-exposed-confidential-information">2. Exposed Information</a></li>
+              <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#3-insecure-file-permissions">3. Insecure Permissions</a></li>
+              <li><a href="/privilege-escalation/docs/linux-privilege-escalation/#4-insecure-system-components">4. System Components</a></li>
                 </ul>
                 
-                <h3>Windows Privilege Escalation</h3>
+            <h3>Switch Guide</h3>
                 <ul>
-                    <li><a href="/privilege-escalation/docs/windows-privilege-escalation/">View Guide</a></li>
+              <li><a href="/privilege-escalation/docs/windows-privilege-escalation/">Windows Privilege Escalation</a></li>
                 </ul>
             </nav>
         </aside>
@@ -586,6 +587,52 @@ ls -lah /usr/bin/<binary>*
         </p>
     </div>
 </footer>
+
+  <script>
+  (() => {
+    const tocLinks = Array.from(document.querySelectorAll('.docs-nav a[href*="#"]'));
+    if (!tocLinks.length) return;
+
+    const sectionMap = new Map();
+    tocLinks.forEach((link) => {
+      const hash = link.hash;
+      if (!hash) return;
+      const target = document.getElementById(hash.slice(1));
+      if (target) sectionMap.set(target, link);
+    });
+
+    if (!sectionMap.size) return;
+
+    const setActive = (activeLink) => {
+      tocLinks.forEach((link) => link.classList.toggle('active', link === activeLink));
+    };
+
+    const updateFromHash = () => {
+      const current = tocLinks.find((link) => link.hash === window.location.hash);
+      if (current) setActive(current);
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+      if (visible.length > 0) {
+        const activeTarget = visible[0].target;
+        const activeLink = sectionMap.get(activeTarget);
+        if (activeLink) setActive(activeLink);
+      }
+    }, {
+      root: null,
+      rootMargin: '-20% 0px -65% 0px',
+      threshold: [0, 1]
+    });
+
+    sectionMap.forEach((_, section) => observer.observe(section));
+    updateFromHash();
+    window.addEventListener('hashchange', updateFromHash);
+  })();
+  </script>
 
 </body>
 </html>
