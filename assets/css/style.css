@@ -27,11 +27,11 @@ body.theme-windows {
 }
 
 body.theme-home {
-    --primary: #fca5a5;
+    --primary: #f87171;
     --accent: #ef4444;
-    --accent-soft: #fee2e2;
-    --lighter: #fef2f2;
-    --border: #fda4af;
+    --accent-soft: #ffe4e6;
+    --lighter: #fff1f2;
+    --border: #fca5a5;
 }
 
 * {
@@ -101,10 +101,10 @@ body {
 
 .github-corner {
     position: absolute;
-    top: 0;
+    top: 0.02rem;
     right: 0;
-    width: 2.65rem;
-    height: 2.65rem;
+    width: 3rem;
+    height: 3rem;
     color: rgba(255, 255, 255, 0.95);
     display: inline-flex;
     align-items: center;
@@ -121,29 +121,34 @@ body {
 }
 
 .github-corner svg {
-    width: 1.35rem;
-    height: 1.35rem;
+    width: 1.55rem;
+    height: 1.55rem;
     fill: currentColor;
 }
 
 .github-star-link {
     position: absolute;
-    top: 0.25rem;
-    right: 3.15rem;
-    padding: 0.35rem 0.7rem;
+    top: 0.28rem;
+    right: 3.55rem;
+    height: 2.45rem;
+    min-width: 175px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.45);
-    color: #fff;
     background: rgba(255, 255, 255, 0.14);
-    text-decoration: none;
-    font-size: 0.84rem;
-    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: all 0.2s ease;
+    padding: 0 0.45rem;
 }
 
 .github-star-link:hover {
     background: rgba(255, 255, 255, 0.24);
-    text-decoration: none;
+}
+
+.github-star-link iframe {
+    width: 165px;
+    height: 30px;
 }
 
 .site-title a {
